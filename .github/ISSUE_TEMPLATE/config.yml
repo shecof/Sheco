@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Report a security vulnerability privately
+    url: mailto:shecof@ya.ru
+    about: Send reproduction details privately; do not open a public issue with exploit details or credentials.

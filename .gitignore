@@ -1,0 +1,52 @@
+# Dependencies and generated application output
+/node_modules/
+/dist/
+/dist-electron/
+/release/
+/build/THIRD_PARTY_NOTICES.txt
+/build/icon.iconset/
+
+# Test output includes the persistent, user-edited design preview. Never clean it wholesale.
+/test-results/
+/playwright-report/
+/coverage/
+/.sheco-data/
+
+# User workspaces, registries, credentials, and recovery snapshots anywhere in this checkout
+workspace.json
+spaces.json
+mcp.json
+writer.lock
+**/metadata/backups/
+**/metadata/manual-backups/
+**/metadata/damaged-*.json
+
+# Local environment and signing material
+.env*
+!.env.example
+*.p12
+*.pfx
+*.pem
+*.key
+*.mobileprovision
+
+# OS files and logs
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.log
+
+# Local development instructions and private verification notes
+AGENTS.md
+/docs/agents/
+/VALIDATION.md
+/docs/open-source-readiness.md
+
+# Local credentials, signing inputs, and user content
+.npmrc
+.netrc
+*.cer
+*.crt
+*.certSigningRequest
+*.provisionprofile
+**/attachments/

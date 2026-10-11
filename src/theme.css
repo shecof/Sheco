@@ -1,0 +1,159 @@
+:root {
+  color-scheme: light;
+  --canvas: #fff;
+  --sidebar: #f5f5f5;
+  --tabbar: #fafafa;
+  --text: #303030;
+  --title: #202020;
+  --secondary: #505050;
+  --muted: #8a8a8a;
+  --faint: #b5b5b5;
+  --green: #252525;
+  --green-hover: #080808;
+  --primary-bg: #252525;
+  --primary-hover: #080808;
+  --primary-border: #252525;
+  --primary-text: #fff;
+  --sage: #f1f1f1;
+  --sage-border: #dedede;
+  --active: #e8e8e8;
+  --hover: #ebebeb;
+  --subtle: #fafafa;
+  --search-bg: #ededed;
+  --border: #e6e6e6;
+  --border-light: #f0f0f0;
+  --border-strong: #d5d5d5;
+  --scroll: #d7d7d7;
+  --local-green: #777777;
+  --star: #787878;
+  --selection: #c7c7c780;
+  --row-hover: #fafafa;
+  --code-bg: #f6f6f6;
+  --code-inline: var(--green);
+  --code-inline-bg: #2525250e;
+  --link: #285ac7;
+  --table-border: #e6e6e6;
+  --table-header: #eeeeee;
+  --shadow: 0 8px 36px #00000014, 0 2px 6px #0000000a;
+  --toast-bg: #fff;
+  --callout-gray: #f3f3f3;
+  --callout-yellow: #fff6dc;
+  --callout-red: #ffeded;
+  --callout-green: #eaf5ee;
+  --toast-text: #505050;
+  --tag-green-bg: #e7f1e2;
+  --tag-green-text: #52724d;
+  --tag-blue-bg: #e8eff6;
+  --tag-blue-text: #5a7798;
+  --tag-purple-bg: #eeebf5;
+  --tag-purple-text: #82709d;
+  --tag-amber-bg: #f7f0dd;
+  --tag-amber-text: #a08645;
+  --tag-pink-bg: #f6e8e8;
+  --tag-pink-text: #a26972;
+  --tag-peach-bg: #f7ecdf;
+  --tag-peach-text: #a37c53;
+}
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --canvas: #1e1e1e;
+  --sidebar: #181818;
+  --tabbar: #1a1a1a;
+  --text: #e5e5e5;
+  --title: #eeeeee;
+  --secondary: #c8c8c8;
+  --muted: #939393;
+  --faint: #626262;
+  --green: #d4d4d4;
+  --green-hover: #ffffff;
+  --primary-bg: #343434;
+  --primary-hover: #414141;
+  --primary-border: #565656;
+  --primary-text: #f2f2f2;
+  --sage: #2d2d2d;
+  --sage-border: #424242;
+  --active: #383838;
+  --hover: #303030;
+  --subtle: #252525;
+  --search-bg: #242424;
+  --border: #353535;
+  --border-light: #2e2e2e;
+  --border-strong: #4a4a4a;
+  --scroll: #484848;
+  --local-green: #a0a0a0;
+  --star: #b7b7b7;
+  --selection: #88888870;
+  --row-hover: #252525;
+  --code-bg: #222222;
+  --code-inline: var(--green);
+  --code-inline-bg: #ffffff14;
+  --link: #96b9ff;
+  --table-border: #393939;
+  --table-header: #303030;
+  --shadow: 0 8px 36px #0006, 0 2px 6px #0003;
+  --toast-bg: #2b2b2b;
+  --callout-gray: #2d2d2d;
+  --callout-yellow: #393323;
+  --callout-red: #3c2929;
+  --callout-green: #27372e;
+  --toast-text: #dedede;
+  --tag-green-bg: #2e4530;
+  --tag-green-text: #a0bf91;
+  --tag-blue-bg: #293c48;
+  --tag-blue-text: #9fbad1;
+  --tag-purple-bg: #3b354b;
+  --tag-purple-text: #b8a3cf;
+  --tag-amber-bg: #443e26;
+  --tag-amber-text: #c4b27a;
+  --tag-pink-bg: #472e35;
+  --tag-pink-text: #c59ba4;
+  --tag-peach-bg: #46392a;
+  --tag-peach-text: #c9aa85;
+}
+:root[data-accent='blue'],
+.accent-options [data-accent='blue'] {
+  --accent: #285ac7;
+}
+:root[data-accent='green'],
+.accent-options [data-accent='green'] {
+  --accent: #27724c;
+}
+:root[data-accent='purple'],
+.accent-options [data-accent='purple'] {
+  --accent: #7951b0;
+}
+:root[data-accent='orange'],
+.accent-options [data-accent='orange'] {
+  --accent: #a35120;
+}
+.accent-options [data-accent='neutral'] {
+  --accent: #555555;
+}
+:root[data-theme='dark'][data-accent='blue'] {
+  --accent: #96b9ff;
+}
+:root[data-theme='dark'][data-accent='green'] {
+  --accent: #8bc7a5;
+}
+:root[data-theme='dark'][data-accent='purple'] {
+  --accent: #c4a7ed;
+}
+:root[data-theme='dark'][data-accent='orange'] {
+  --accent: #edb37e;
+}
+:root[data-accent]:not([data-accent='neutral']) {
+  --code-inline: var(--accent);
+  --code-inline-bg: color-mix(in srgb, var(--accent) 9%, transparent);
+  --green: var(--accent);
+  --green-hover: color-mix(in srgb, var(--accent), var(--title) 20%);
+  --primary-bg: var(--accent);
+  --primary-hover: var(--green-hover);
+  --primary-border: var(--accent);
+  --sage: color-mix(in srgb, var(--accent) 10%, var(--canvas));
+  --sage-border: color-mix(in srgb, var(--accent) 25%, var(--canvas));
+  --selection: color-mix(in srgb, var(--accent) 25%, transparent);
+  --link: var(--accent);
+}
+:root[data-theme='dark'][data-accent]:not([data-accent='neutral']) {
+  --primary-text: #181818;
+}

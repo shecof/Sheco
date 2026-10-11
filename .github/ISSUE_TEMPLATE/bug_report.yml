@@ -1,0 +1,40 @@
+name: Bug report
+description: Report a reproducible problem using synthetic data.
+title: '[Bug] '
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For vulnerabilities, email shecof@ya.ru privately. Do not include credentials, personal workspaces, or private screenshots here.
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: Include the commit when running from source, or the app version for an installer.
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Operating system and architecture
+      placeholder: e.g. macOS / Apple Silicon, or Windows / x64
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Use a fresh test workspace and a minimal synthetic example where possible.
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Expected and observed behavior
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Safe screenshots, relevant logs with secrets removed, and whether the issue persists in a fresh workspace.

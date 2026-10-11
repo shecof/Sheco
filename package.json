@@ -1,0 +1,130 @@
+{
+  "name": "sheco",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A local home for your knowledge",
+  "author": "Sheco",
+  "license": "MIT",
+  "type": "module",
+  "main": "dist-electron/main.cjs",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "build": "npm run notices && npm run typecheck && vite build && node scripts/build-electron.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:e2e": "node scripts/smoke.mjs",
+    "dist:mac": "npm run build && node scripts/package.mjs mac",
+    "dist:win": "npm run build && node scripts/package.mjs win",
+    "pack": "npm run build && node scripts/package.mjs dir",
+    "check": "npm run typecheck && npm test && npm run build",
+    "icons": "node scripts/icons.mjs",
+    "format": "prettier --write src electron tests scripts *.ts *.json index.html README.md SECURITY.md",
+    "notices": "node scripts/notices.mjs",
+    "test:review": "node scripts/review.mjs",
+    "preview": "node scripts/preview.mjs",
+    "test:images": "node scripts/image-review.mjs",
+    "test:media": "node scripts/media-review.mjs",
+    "test:attachments": "node scripts/attachment-review.mjs",
+    "test:blocks": "node scripts/blocks-review.mjs",
+    "test:remarks": "node scripts/remarks-review.mjs",
+    "test:reading": "node scripts/reading-review.mjs",
+    "test:tables": "node scripts/table-review.mjs",
+    "test:mcp": "node scripts/mcp-review.mjs",
+    "test:improvements": "node scripts/improvements-review.mjs",
+    "test:knowledge": "node scripts/knowledge-features-review.mjs",
+    "test:plugins": "node scripts/plugins-review.mjs"
+  },
+  "build": {
+    "appId": "app.sheco.desktop",
+    "productName": "Sheco",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**",
+      "dist-electron/**",
+      "package.json",
+      "!node_modules/**/*",
+      "LICENSE",
+      "build/THIRD_PARTY_NOTICES.txt"
+    ],
+    "asar": true,
+    "npmRebuild": false,
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "hardenedRuntime": true,
+      "darkModeSupport": true,
+      "icon": "build/icon.icns"
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "zip"
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "artifactName": "Sheco-${version}-${os}-${arch}.${ext}",
+    "toolsets": {
+      "nsis": "1.2.1"
+    }
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.1",
+    "@tiptap/extension-code-block-lowlight": "^3.31.4",
+    "@tiptap/extension-details": "^3.31.4",
+    "@tiptap/extension-drag-handle-react": "^3.31.4",
+    "@tiptap/extension-image": "^3.31.4",
+    "@tiptap/extension-list": "^3.31.4",
+    "@tiptap/extension-mathematics": "^3.31.4",
+    "@tiptap/extension-placeholder": "^3.31.4",
+    "@tiptap/extension-table": "^3.31.4",
+    "@tiptap/markdown": "^3.31.4",
+    "@tiptap/pm": "^3.31.4",
+    "@tiptap/react": "^3.31.4",
+    "@tiptap/starter-kit": "^3.31.4",
+    "dompurify": "3.4.16",
+    "katex": "^0.18.10",
+    "lowlight": "^3.3.0",
+    "lucide-react": "^1.52.0",
+    "marked": "^18.1.0",
+    "mermaid": "12.1.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "zod": "^4.6.5"
+  },
+  "overrides": {
+    "katex": "$katex"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@types/katex": "^0.16.8",
+    "@types/node": "^26.6.4",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "electron": "^44.5.1",
+    "electron-builder": "^26.15.3",
+    "esbuild": "^0.28.2",
+    "prettier": "^3.9.9",
+    "sharp": "^0.35.5",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.2",
+    "vitest": "^5.0.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/shecof/Sheco.git"
+  },
+  "bugs": {
+    "url": "https://github.com/shecof/Sheco/issues"
+  },
+  "homepage": "https://github.com/shecof/Sheco#readme"
+}

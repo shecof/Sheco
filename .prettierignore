@@ -1,0 +1,9 @@
+node_modules
+dist
+dist-electron
+release
+test-results
+package-lock.json
+build/*.png
+build/*.icns
+build/*.ico
