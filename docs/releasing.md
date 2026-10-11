@@ -3,7 +3,8 @@
 Sheco can publish its source independently of distributing installers. The current repository has
 an MIT license and an unsigned CI packaging workflow.
 [The repository](https://github.com/shecof/Sheco) is currently private and can be made public later.
-Automatic release uploads and platform signing/notarization are not configured.
+Releases are uploaded manually. CI artifacts remain unsigned; macOS release signing and
+notarization use a local Developer ID identity and a notarytool Keychain profile.
 
 ## Publish source
 
@@ -68,10 +69,53 @@ descriptive suffixes such as `-updated`, or overwrite a previous build to reuse 
 An explicit `--config.directories.output=...` is still supported; choose a new directory when
 using it. Direct `electron-builder` invocations also need an explicit output directory.
 
-For a trusted public binary release, configure macOS Developer ID signing and notarization and
+For a trusted public binary release, use macOS Developer ID signing and notarization and
 Windows code signing in an appropriate protected release environment. Validate the signatures
-and installation behavior. Label any intentionally unsigned evaluation artifacts clearly.
+and installation behavior. Label intentionally unsigned Windows artifacts clearly.
 See [Electron's signing guide](https://www.electronjs.org/docs/latest/tutorial/code-signing).
+
+## Sign and notarize macOS releases
+
+Install a **Developer ID Application** certificate with its matching private key in the build
+machine's Keychain. An Apple Development or Mac App Store certificate does not replace it for
+distribution through GitHub. Keep private keys, certificate exports, and authentication material
+outside the repository and release assets.
+
+Create a local notarytool profile interactively; enter credentials at its prompts, rather than in
+shell history, documentation, or environment files:
+
+```sh
+xcrun notarytool store-credentials sheco-notary
+xcrun notarytool history --keychain-profile sheco-notary
+```
+
+Build with the validated profile and require a signing identity:
+
+```sh
+CSC_IDENTITY_AUTO_DISCOVERY=true APPLE_KEYCHAIN_PROFILE=sheco-notary \
+  npm run dist:mac -- --config.forceCodeSigning=true --config.dmg.sign=true \
+  '--config.mac.signIgnore=\.pak$'
+```
+
+If multiple Developer ID identities are installed, select the intended team explicitly with
+`--config.mac.identity="Developer Name (TEAMID)"`. Keep hardened runtime enabled. Check the build
+log for successful notarization of both architectures; `forceCodeSigning` requires a signature
+but does not require notarization when credentials are absent. Do not upload a build that only
+reports skipped notarization.
+
+The `signIgnore` rule skips separate signatures on Chromium localization/resource `.pak` files,
+which are data rather than executable code. Their integrity remains covered by the enclosing
+bundle's resource seal. This avoids repeatedly signing the same localization resources through
+Electron framework symlinks. Executables, frameworks, libraries, and helper apps remain signed.
+
+Verify each final app with `codesign --verify --deep --strict`, `spctl --assess --type execute`,
+and `xcrun stapler validate`. DMGs can also be submitted to notarytool and stapled so their ticket
+is available without a network connection. Run signature and ticket checks before calculating
+the final checksums. ZIP files contain the signed, stapled app; ZIP files themselves do not
+support stapling.
+
+See [Apple's Developer ID instructions](https://developer.apple.com/help/account/certificates/create-developer-id-certificates/)
+and [notarization documentation](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution).
 
 ## Verify the artifacts
 

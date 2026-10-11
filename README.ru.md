@@ -65,13 +65,29 @@ Sheco — приложение для **macOS и Windows**: заметки, св
 ## Состояние проекта
 
 Проект активно разрабатывается. Есть исходники и конфигурация CI для macOS и Windows;
-репозиторий пока приватный, публичные установщики ещё не опубликованы.
-Ниже описан запуск из исходников.
+репозиторий пока приватный. Файлы в
+[Releases](https://github.com/shecof/Sheco/releases) доступны пользователям с доступом к репозиторию.
 Сборка и проверка работы в Linux не предусмотрены.
 
 Проверяйте [результаты CI](https://github.com/shecof/Sheco/actions) для нужной ревизии.
 Наличие CI или старого установщика не подтверждает работу текущей версии на всех платформах.
 Требования к распространению описаны в [подготовке релиза](docs/releasing.md).
+
+## Установка
+
+Скачайте [Sheco 1.0.0](https://github.com/shecof/Sheco/releases/tag/v1.0.0):
+
+| Платформа           | Файлы                                                                                                                                                                                    | Подпись                            |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
+| macOS Apple Silicon | [DMG](https://github.com/shecof/Sheco/releases/download/v1.0.0/Sheco-1.0.0-mac-arm64.dmg) · [ZIP](https://github.com/shecof/Sheco/releases/download/v1.0.0/Sheco-1.0.0-mac-arm64.zip)    | Developer ID и нотарификация Apple |
+| macOS Intel         | [DMG](https://github.com/shecof/Sheco/releases/download/v1.0.0/Sheco-1.0.0-mac-x64.dmg) · [ZIP](https://github.com/shecof/Sheco/releases/download/v1.0.0/Sheco-1.0.0-mac-x64.zip)        | Developer ID и нотарификация Apple |
+| Windows x64         | [Установщик](https://github.com/shecof/Sheco/releases/download/v1.0.0/Sheco-1.0.0-win-x64.exe) · [ZIP](https://github.com/shecof/Sheco/releases/download/v1.0.0/Sheco-1.0.0-win-x64.zip) | Без подписи                        |
+
+На macOS откройте DMG и перенесите Sheco в Applications либо распакуйте ZIP и перенесите
+приложение туда. На Windows запустите установщик либо распакуйте ZIP и откройте `Sheco.exe`.
+Windows может показать предупреждение о неизвестном издателе: Windows-сборки пока не подписаны.
+
+В релизе есть `SHA256SUMS.txt`, результаты проверок и ограничения по платформам для этих файлов.
 
 ## Запуск из исходников
 

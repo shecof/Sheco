@@ -63,12 +63,29 @@ Screenshots show the macOS app with fictional demo content. [About the screensho
 ## Project status
 
 Sheco is in active development. This repository contains source code and a macOS/Windows CI
-workflow. The repository is currently private; public installers have not been published.
-Build from source using the commands below. Linux packaging and runtime verification are not provided.
+workflow. The repository is currently private; downloads in
+[Releases](https://github.com/shecof/Sheco/releases) are available to people with repository access.
+Linux packaging and runtime verification are not provided.
 
 Check the [CI results](https://github.com/shecof/Sheco/actions) for the revision you use.
 A configured CI job or an existing installer is not proof that the current revision passed on
 every platform. See [release preparation](docs/releasing.md) for distribution requirements.
+
+## Install
+
+Download [Sheco 1.0.0](https://github.com/shecof/Sheco/releases/tag/v1.0.0):
+
+| Platform            | Downloads                                                                                                                                                                               | Signing                                    |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| macOS Apple Silicon | [DMG](https://github.com/shecof/Sheco/releases/download/v1.0.0/Sheco-1.0.0-mac-arm64.dmg) · [ZIP](https://github.com/shecof/Sheco/releases/download/v1.0.0/Sheco-1.0.0-mac-arm64.zip)   | Developer ID signed and notarized by Apple |
+| macOS Intel         | [DMG](https://github.com/shecof/Sheco/releases/download/v1.0.0/Sheco-1.0.0-mac-x64.dmg) · [ZIP](https://github.com/shecof/Sheco/releases/download/v1.0.0/Sheco-1.0.0-mac-x64.zip)       | Developer ID signed and notarized by Apple |
+| Windows x64         | [Installer](https://github.com/shecof/Sheco/releases/download/v1.0.0/Sheco-1.0.0-win-x64.exe) · [ZIP](https://github.com/shecof/Sheco/releases/download/v1.0.0/Sheco-1.0.0-win-x64.zip) | Unsigned                                   |
+
+On macOS, open the DMG and drag Sheco to Applications, or extract the ZIP and move the app there.
+On Windows, run the installer, or extract the ZIP and open `Sheco.exe`. Windows may show an
+unknown-publisher warning because these Windows builds are unsigned.
+
+The release includes `SHA256SUMS.txt` and the checks and platform limits for these exact files.
 
 ## Try it from source
 
