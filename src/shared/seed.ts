@@ -12,7 +12,7 @@ const code = (value: string, language = 'bash'): DocNode => ({
   attrs: { language },
   content: [text(value)],
 })
-export function seedWorkspace(name = 'Pentest', demo = true): Workspace {
+export function seedWorkspace(name = 'Knowledge', demo = true): Workspace {
   const now = new Date().toISOString()
   const w: Workspace = {
     schemaVersion: 1,

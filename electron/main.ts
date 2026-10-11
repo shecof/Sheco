@@ -151,7 +151,7 @@ async function boot() {
       )
     const root = process.env.SHECO_DATA_DIR
       ? path.join(process.env.SHECO_DATA_DIR, 'Knowledge')
-      : path.join(app.getPath('documents'), 'Sheco', 'Pentest')
+      : path.join(app.getPath('documents'), 'Sheco', 'Knowledge')
     store = new WorkspaceStore(root)
     if (
       await fs.stat(path.join(root, 'workspace.json')).then(

@@ -42,6 +42,22 @@ themes for your workspace.
 
 ![The reading list shown as a board in Sheco's dark theme](docs/screenshots/board-dark-en.png)
 
+**Keep code and its explanation together.** Syntax highlighting, line numbers, and comments
+attached to selected ranges make useful snippets easier to revisit.
+
+![A TypeScript code block in Sheco with syntax highlighting, line numbers, and an open comment](docs/screenshots/code-comments-en.png)
+
+**Bring images and files into a note.** Add local pictures with captions and keep supporting
+documents nearby as file cards or compact attachments.
+
+![A note in Sheco with a local illustration, caption, and Markdown, CSV, and image attachments](docs/screenshots/images-files-en.png)
+
+**Build commands with a plugin.** Choose a tool, add parameters, and copy the assembled command
+for Bash/Zsh or PowerShell. The optional command builder never executes commands.
+See the [plugin guide](docs/plugins.md) for tool configuration and portable catalogs.
+
+![Sheco's command builder plugin assembling an nmap command from targets, ports, and selected options](docs/screenshots/command-builder-en.png)
+
 Screenshots show the macOS app with fictional demo content. [About the screenshots](docs/screenshots/README.md).
 
 ## Project status
@@ -82,10 +98,10 @@ npm run dev
 Remove-Item Env:SHECO_DATA_DIR
 ```
 
-The first isolated run creates a sample **Pentest** workspace under that folder's `Knowledge/`
+The first isolated run creates a sample **Knowledge** workspace under that folder's `Knowledge/`
 directory. Use the workspace menu to create an empty workspace or open your own folder.
 Running `npm run dev` without the override uses normal app data and can create
-`Documents/Sheco/Pentest`. See the [development guide](docs/development/development.md) for preview
+`Documents/Sheco/Knowledge`. See the [development guide](docs/development/development.md) for preview
 and debugging instructions.
 
 ## Your data

@@ -265,7 +265,7 @@ try {
   await expect(page.locator('.sidebar')).not.toContainText('Tools')
   await saved()
   await page.locator('.space-switcher > button').click()
-  await page.locator('.space-menu .menu-item').filter({ hasText: 'Pentest' }).click()
+  await page.locator('.space-menu .menu-item').filter({ hasText: 'Knowledge' }).click()
   await expect(page.getByLabel('Page title')).toHaveValue('Imported')
   await page.locator('.breadcrumbs > button').click()
   await page.getByRole('button', { name: 'Settings', exact: true }).click()

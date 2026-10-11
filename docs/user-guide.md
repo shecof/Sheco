@@ -1,8 +1,8 @@
 # Using Sheco
 
 See [README.md](../README.md) for a quick start and [development](development/development.md)
-for isolated source runs. The first normal launch creates the illustrative **Pentest** workspace
-in `Documents/Sheco/Pentest`; an isolated launch creates it beneath `SHECO_DATA_DIR/Knowledge`.
+for isolated source runs. The first normal launch creates the illustrative **Knowledge** workspace
+in `Documents/Sheco/Knowledge`; an isolated launch creates it beneath `SHECO_DATA_DIR/Knowledge`.
 Use the workspace menu to create an empty space or open an existing one.
 
 ## What is included

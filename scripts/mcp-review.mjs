@@ -67,7 +67,14 @@ try {
   await page.getByRole('button', { name: 'Settings', exact: true }).click()
   const settings = page.getByRole('dialog', { name: 'Settings', exact: true })
   const categories = settings.getByRole('tablist', { name: 'Settings categories' })
-  await expect(categories.getByRole('tab')).toHaveCount(5)
+  await expect(categories.getByRole('tab')).toHaveText([
+    'General',
+    'Workspace',
+    'Data & backups',
+    'AI agents · MCP',
+    'Plugins',
+    'About Sheco',
+  ])
   const general = categories.getByRole('tab', { name: 'General', exact: true })
   await expect(general).toBeFocused()
   await expect(settings.getByRole('tabpanel', { name: 'General', exact: true })).toBeVisible()
@@ -377,7 +384,7 @@ try {
   await expect(page.getByLabel('Page title')).toHaveValue('Welcome to MCP second space')
   await rejected('get_workspace', {}, 'authorized workspace')
   await page.locator('.space-switcher > button').click()
-  await page.locator('.space-menu .menu-item').filter({ hasText: 'Pentest' }).click()
+  await page.locator('.space-menu .menu-item').filter({ hasText: workspace.name }).click()
   await expect(page.getByLabel('Page title')).toHaveValue('Agent and editor')
   expect((await call('get_workspace')).id).toBe(workspace.id)
   await client.close()
