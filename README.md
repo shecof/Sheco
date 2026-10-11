@@ -10,6 +10,8 @@ is required. The interface supports **English and Russian**.
 [Documentation](docs/README.md) · [Contributing](CONTRIBUTING.md) ·
 [Repository](https://github.com/shecof/Sheco)
 
+![Sheco's block editor with a project notebook, tasks, connected pages, and an outline](docs/screenshots/editor-en.png)
+
 ## Features
 
 - **Connected pages:** nested pages, tabs, favorites, wiki links, backlinks, workspace search,
@@ -27,6 +29,20 @@ is required. The interface supports **English and Russian**.
   command builder that copies commands. MCP is disabled by default; the builder never runs commands.
 - **Comfortable reading:** light/dark/system appearance, accent colors, page outline,
   reading width and font-size controls.
+
+## A closer look
+
+**Organize a collection.** Use typed properties, status tags, and notes to keep useful references
+together. Every database entry opens as a complete page.
+
+![A reading-list database in Sheco with status, topic, and note properties](docs/screenshots/database-en.png)
+
+**See the same collection as a board.** Switch views to follow progress, with light and dark
+themes for your workspace.
+
+![The reading list shown as a board in Sheco's dark theme](docs/screenshots/board-dark-en.png)
+
+Screenshots show the macOS app with fictional demo content. [About the screenshots](docs/screenshots/README.md).
 
 ## Project status
 
