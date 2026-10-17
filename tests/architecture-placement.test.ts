@@ -520,10 +520,10 @@ describe('architecture audit regressions', () => {
     ).toBe(false)
     expect(architectureBalances(settled)).toEqual(architectureBalances(project))
   })
-  it('keeps long return links separate within a maximum connected graph', () => {
-    const project = createArchitectureProject('Maximum graph')
+  it('keeps long return links separate across connected sites', () => {
+    const project = createArchitectureProject('Connected sites')
     project.presentation = { showTitle: false, showResources: true, showBalances: false }
-    project.sites = Array.from({ length: 100 }, (_, index) => ({
+    project.sites = Array.from({ length: 20 }, (_, index) => ({
       id: crypto.randomUUID(),
       name: 'Site ' + index,
     }))
@@ -538,10 +538,13 @@ describe('architecture audit regressions', () => {
         parameters: [],
       })),
     )
-    project.links = Array.from({ length: 1000 }, (_, index) => ({
+    const objectCount = project.objects.length
+    project.links = Array.from({ length: objectCount * 2 }, (_, index) => ({
       id: crypto.randomUUID(),
-      from: project.objects[index % 500].id,
-      to: project.objects[((index % 500) + (Math.floor(index / 500) + 1) * 7) % 500].id,
+      from: project.objects[index % objectCount].id,
+      to: project.objects[
+        ((index % objectCount) + (Math.floor(index / objectCount) + 1) * 7) % objectCount
+      ].id,
       label: 'HTTPS ' + index,
     }))
     const layout = architectureDiagramLayout(project)

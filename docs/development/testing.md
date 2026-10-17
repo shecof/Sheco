@@ -28,7 +28,10 @@ and selection-only card frames without selected-count text. Evidence is under `t
 on a page with 500 objects/1000 links. Its 500 ms mean latency budget is a local regression gate,
 not a universal device guarantee. Evidence remains under `test-results/architecture-audit-fixes/`.
 Unit cases cover grid positions, expansion/swaps, moving grouped children, detached objects,
-capacity accounting, routing and legacy snapshot validation. The old `architecture-review.mjs`,
+capacity accounting, routing and legacy snapshot validation. The connected-site routing regression uses
+20 sites, 100 objects and 200 links, including long return links. It checks route separation,
+card avoidance and label presence; the dense desktop suite above exercises the full 500-object/
+1000-link fixture separately. The old `architecture-review.mjs`,
 `architecture-placement-review.mjs` and `architecture-audit-review.mjs` scripts target the retired
 library/project selector; they are historical reproductions, not current page-workflow checks.
 
