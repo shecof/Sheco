@@ -11,7 +11,10 @@ let page
 const errors = []
 const mod = process.platform === 'darwin' ? 'Meta' : 'Control'
 async function launch() {
-  app = await electron.launch({ args: ['.'], env: { ...process.env, SHECO_DATA_DIR: root } })
+  app = await electron.launch({
+    args: [process.env.SHECO_TEST_MAIN ?? '.'],
+    env: { ...process.env, SHECO_DATA_DIR: root },
+  })
   page = await app.firstWindow()
   page.on('pageerror', (e) => errors.push(e.message))
   await expect(page.getByLabel('Page title')).toBeVisible({ timeout: 20000 })
@@ -285,6 +288,7 @@ try {
   await saved()
   // Block action coordinates stay in the viewport, including on a scrolled note.
   const block = page.locator('.callout-block')
+  const calloutText = await block.locator('.callout-content').innerText()
   await block.scrollIntoViewIfNeeded()
   await block.evaluate((el) => {
     const scroll = el.closest('.content-scroll')
@@ -304,11 +308,54 @@ try {
   expect(Math.abs(menuBox.y - clickY)).toBeLessThanOrEqual(1)
   expect(await blockMenu.evaluate((el) => getComputedStyle(el).position)).toBe('fixed')
   await page.screenshot({ path: path.join(output, 'block-menu.png') })
-  await blockMenu.getByRole('button', { name: 'Turn into…', exact: true }).click()
-  const expandedMenu = await blockMenu.boundingBox()
+  await blockMenu.getByRole('button', { name: 'Turn into…', exact: true }).hover()
+  const typeMenu = page.locator('.block-type-submenu')
+  await expect(typeMenu).toBeVisible()
+  const expandedMenu = await typeMenu.boundingBox()
   const viewportHeight = await page.evaluate(() => window.innerHeight)
   expect(expandedMenu.y).toBeGreaterThanOrEqual(8)
   expect(expandedMenu.y + expandedMenu.height).toBeLessThanOrEqual(viewportHeight - 7)
+  expect(expandedMenu.x).toBeGreaterThan(menuBox.x + menuBox.width - 8)
+  await page.screenshot({ path: path.join(output, 'block-submenu.png') })
+  await expect(blockMenu.getByRole('button', { name: 'Move down', exact: true })).toBeVisible()
+  // A diagonal path to the bottom of the submenu crosses sibling actions. Keep it open
+  // beyond the ordinary dismissal delay, without changing focus or document content.
+  const turnTrigger = blockMenu.getByRole('button', { name: 'Turn into…', exact: true })
+  const triggerBox = await turnTrigger.boundingBox()
+  const from = { x: triggerBox.x + triggerBox.width / 2, y: triggerBox.y + triggerBox.height / 2 }
+  const to = { x: expandedMenu.x + 20, y: expandedMenu.y + expandedMenu.height - 20 }
+  await page.mouse.move(from.x, from.y)
+  for (let step = 1; step <= 30; step++) {
+    await page.mouse.move(
+      from.x + ((to.x - from.x) * step) / 30,
+      from.y + ((to.y - from.y) * step) / 30,
+    )
+    await page.waitForTimeout(25)
+    await expect(typeMenu).toBeVisible()
+  }
+  await page.waitForTimeout(350)
+  await expect(typeMenu).toBeVisible()
+  await typeMenu.getByRole('menuitem', { name: 'Heading 2', exact: true }).click()
+  await expect(blockMenu).toHaveCount(0)
+  await expect(page.locator('.document-editor > h2').filter({ hasText: calloutText })).toHaveText(
+    calloutText,
+  )
+  await page.keyboard.press(mod + '+z')
+  await expect(block).toBeVisible()
+  await block.hover()
+  await grip.click()
+  await turnTrigger.focus()
+  await turnTrigger.press('ArrowRight')
+  await expect(typeMenu.getByRole('menuitem', { name: 'Text', exact: true })).toBeFocused()
+  await page.keyboard.press('ArrowDown')
+  await expect(typeMenu.getByRole('menuitem', { name: 'Heading 1', exact: true })).toBeFocused()
+  await page.keyboard.press('ArrowLeft')
+  await expect(typeMenu).toHaveCount(0)
+  await expect(turnTrigger).toBeFocused()
+  await turnTrigger.press('ArrowRight')
+  await page.keyboard.press('Escape')
+  await expect(typeMenu).toHaveCount(0)
+  await expect(blockMenu).toBeVisible()
   await page.keyboard.press('Escape')
   await expect(blockMenu).toHaveCount(0)
   await block.hover()
@@ -328,10 +375,38 @@ try {
   const edgeMenu = await blockMenu.boundingBox()
   expect(edgeMenu.y).toBeGreaterThanOrEqual(8)
   expect(edgeMenu.y + edgeMenu.height).toBeLessThanOrEqual(viewportHeight - 7)
-  await blockMenu.getByRole('button', { name: 'Turn into…', exact: true }).click()
-  const expandedEdgeMenu = await blockMenu.boundingBox()
+  await blockMenu.getByRole('button', { name: 'Turn into…', exact: true }).hover()
+  await expect(typeMenu).toBeVisible()
+  const expandedEdgeMenu = await typeMenu.boundingBox()
   expect(expandedEdgeMenu.y).toBeGreaterThanOrEqual(8)
   expect(expandedEdgeMenu.y + expandedEdgeMenu.height).toBeLessThanOrEqual(viewportHeight - 7)
+  await page.keyboard.press('Escape')
+  await expect(typeMenu).toHaveCount(0)
+  await page.keyboard.press('Escape')
+  // At the right/bottom viewport edge the same submenu flips left and remains reachable.
+  const viewportWidth = await page.evaluate(() => innerWidth)
+  await block.click({ button: 'right', position: { x: 12, y: 12 } })
+  await page.keyboard.press('Escape')
+  await page
+    .locator('.document-editor > p')
+    .last()
+    .evaluate(
+      (element, point) => {
+        element.dispatchEvent(
+          new MouseEvent('contextmenu', { bubbles: true, clientX: point.x, clientY: point.y }),
+        )
+      },
+      { x: viewportWidth - 10, y: viewportHeight - 10 },
+    )
+  await expect(blockMenu).toBeVisible()
+  await turnTrigger.hover()
+  await floatingPopover(typeMenu)
+  const edgeTypes = await typeMenu.boundingBox()
+  expect(edgeTypes.x + edgeTypes.width).toBeLessThanOrEqual((await blockMenu.boundingBox()).x + 8)
+  await page.screenshot({ path: path.join(output, 'block-submenu-edge.png') })
+  await page.mouse.move(10, 10)
+  await expect(typeMenu).toHaveCount(0)
+  await expect(blockMenu).toBeVisible()
   await page.keyboard.press('Escape')
   console.log('Review: block menu anchor, scrolled note, viewport edges, keyboard and dismissal')
   await page.screenshot({ path: path.join(output, 'note.png') })
@@ -343,6 +418,27 @@ try {
   await page
     .locator('.database-embed .database-view')
     .screenshot({ path: path.join(output, 'dark-database.png') })
+  await block.hover()
+  await grip.click()
+  await turnTrigger.hover()
+  await floatingPopover(typeMenu)
+  await page.screenshot({ path: path.join(output, 'block-submenu-dark.png') })
+  await page.keyboard.press('Escape')
+  await page.keyboard.press('Escape')
+  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  await page.getByRole('button', { name: 'Русский', exact: true }).click()
+  await page.keyboard.press('Escape')
+  await block.hover()
+  await page.getByLabel('Действия с блоком', { exact: true }).click()
+  await blockMenu.getByRole('button', { name: 'Преобразовать в…', exact: true }).hover()
+  await floatingPopover(typeMenu)
+  await expect(typeMenu.getByRole('menuitem', { name: 'Заголовок 2', exact: true })).toBeVisible()
+  await page.screenshot({ path: path.join(output, 'block-submenu-russian.png') })
+  await page.keyboard.press('Escape')
+  await page.keyboard.press('Escape')
+  await page.getByRole('button', { name: 'Настройки', exact: true }).click()
+  await page.getByRole('button', { name: 'English', exact: true }).click()
+  await page.keyboard.press('Escape')
   await page.getByRole('button', { name: 'Settings', exact: true }).click()
   await page.getByTitle('Light', { exact: true }).click()
   await page.keyboard.press('Escape')

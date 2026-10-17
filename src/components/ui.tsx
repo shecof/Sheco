@@ -23,6 +23,7 @@ import {
   GraduationCap,
   Sparkles,
   ChevronDown,
+  Network,
   Check,
 } from 'lucide-react'
 const PopoverOwners = createContext<string[]>([])
@@ -30,6 +31,7 @@ const popoverLayers: string[] = []
 export function PageIcon({ icon, size = 16 }: { icon: string; size?: number }) {
   const icons: Record<string, typeof FileText> = {
     file: FileText,
+    network: Network,
     table: Table2,
     wrench: Wrench,
     folder: Folder,
@@ -161,12 +163,14 @@ export function Popover({
   className = '',
   anchor,
   align = 'start',
+  side = 'bottom',
 }: {
   children: ReactNode
   onClose: () => void
   className?: string
   anchor?: RefObject<HTMLElement | null>
   align?: 'start' | 'end'
+  side?: 'bottom' | 'right'
 }) {
   const { t, language } = useI18n()
 
@@ -233,6 +237,16 @@ export function Popover({
       }
       const margin = 8
       const gap = 4
+      if (side === 'right') {
+        menu.style.maxHeight = `${Math.max(0, window.innerHeight - margin * 2)}px`
+        const { width, height } = menu.getBoundingClientRect()
+        const right = rect.right + gap
+        const left = rect.left - gap - width
+        const x = right + width <= window.innerWidth - margin || left < margin ? right : left
+        menu.style.left = `${Math.max(margin, Math.min(x, window.innerWidth - width - margin))}px`
+        menu.style.top = `${Math.max(margin, Math.min(rect.top, window.innerHeight - height - margin))}px`
+        return
+      }
       const below = window.innerHeight - rect.bottom - gap - margin
       const above = rect.top - gap - margin
       const naturalHeight = Math.max(menu.scrollHeight + 2, menu.offsetHeight)
@@ -259,7 +273,7 @@ export function Popover({
       document.removeEventListener('scroll', schedule, true)
       window.removeEventListener('resize', schedule)
     }
-  }, [anchor, align])
+  }, [anchor, align, side])
 
   useEffect(() => {
     popoverLayers.push(id)
@@ -318,6 +332,7 @@ export function MenuItem({
   danger = false,
   shortcut,
   selected,
+  role,
 }: {
   icon?: ReactNode
   children: ReactNode
@@ -325,12 +340,14 @@ export function MenuItem({
   danger?: boolean
   shortcut?: string
   selected?: boolean
+  role?: 'menuitem'
 }) {
   const { t, language } = useI18n()
 
   return (
     <button
       type="button"
+      role={role}
       className={'menu-item ' + (danger ? 'danger' : '') + (selected ? ' is-selected' : '')}
       aria-pressed={selected}
       onClick={onClick}

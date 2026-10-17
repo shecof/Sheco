@@ -4,9 +4,11 @@ import { EditorContent, useEditor, type Editor, type JSONContent } from '@tiptap
 import { BubbleMenu } from '@tiptap/react/menus'
 import Placeholder from '@tiptap/extension-placeholder'
 import { isImageAttachment, mediaBlocks } from '../shared/media'
-import { BlockMenu } from './BlockMenu'
+import { BlockMenu, BlockSubmenu } from './BlockMenu'
 import { codeCommentSelection, requestCodeComment } from './CodeComments'
-import { documentExtensions } from './documentSchema'
+import { documentExtensions, validateEditorDocument } from './documentSchema'
+import { templateTransaction } from './templateTransactions'
+import { CreateTemplatePageDialog } from '../components/DocumentTemplates'
 import { TableControls } from './TableControls'
 import { FindReplace, FindReplacePanel } from './FindReplace'
 import {
@@ -59,8 +61,19 @@ import {
   Check,
   MessageSquare,
   GitBranch,
+  Network,
+  Ticket,
+  Terminal,
 } from 'lucide-react'
-import { createPage, type Page, type DocNode, type Attachment } from '../shared/model'
+import {
+  commandBuilderTab,
+  documentTemplatesTab,
+  documentTemplatesAvailable,
+  documentTemplatesSettingsTab,
+  dataToolsTab,
+} from '../shared/plugins'
+import { jiraInlineOrigin, jiraEditorText } from './jiraTransactions'
+import { createPage, plainText, type Page, type DocNode, type Attachment } from '../shared/model'
 import { useApp } from '../state'
 import { Modal, MenuItem, PageIcon } from '../components/ui'
 import 'katex/dist/katex.min.css'
@@ -174,6 +187,13 @@ const commands = [
     keywords: 'equation latex',
   },
   {
+    id: 'architecture',
+    name: 'Create architecture diagram',
+    description: 'An architecture subpage with an inline preview',
+    icon: Network,
+    keywords: 'architecture infrastructure project схема архитектура инфраструктура',
+  },
+  {
     id: 'mermaid',
     name: 'Mermaid diagram',
     description: 'Build a diagram from code or visual blocks',
@@ -209,6 +229,48 @@ const commands = [
     keywords: 'pdf file archive',
   },
   {
+    id: 'jira',
+    name: 'Jira issue',
+    description: 'Add an issue from Jira',
+    icon: Ticket,
+    keywords: 'jira task issue задача джира',
+  },
+  {
+    id: 'template',
+    name: 'Insert template',
+    description: 'Insert a saved template at the cursor',
+    icon: FilePlus2,
+    keywords: 'template вставить шаблон',
+  },
+  {
+    id: 'templates',
+    name: 'Document templates',
+    description: 'Create a document from a template',
+    icon: FilePlus2,
+    keywords: 'templates template шаблоны шаблон документ',
+  },
+  {
+    id: 'data',
+    name: 'Data tools',
+    description: 'Format, encode or transform data',
+    icon: Terminal,
+    keywords: 'data json xml csv base64 encoding данные форматирование кодировка',
+  },
+  {
+    id: 'jira-inline',
+    name: 'Jira issue in text',
+    description: 'Issue key and status within a sentence',
+    icon: Ticket,
+    keywords: 'jira-inline jira mention minimal task issue задача джира текст упоминание',
+  },
+  {
+    id: 'commands',
+    name: 'Command builder',
+    description: 'Open command builder',
+    icon: Terminal,
+    keywords: 'commands terminal tools команды терминал инструменты конструктор',
+  },
+  {
     id: 'page',
     name: 'Page',
     description: 'Create a nested page',
@@ -226,7 +288,8 @@ const commands = [
 export function BlockEditor({ page }: { page: Page }) {
   const { t, language } = useI18n()
 
-  const { w, editPage, update, run, notify, addAttachments, newPage, remoteEdits } = useApp()
+  const { w, editPage, update, run, notify, addAttachments, newPage, remoteEdits, openPage } =
+    useApp()
   const remoteVersion = remoteEdits[page.id] ?? 0
   const lastRemoteVersion = useRef(remoteVersion)
   const workspaceRef = useRef(w)
@@ -239,7 +302,6 @@ export function BlockEditor({ page }: { page: Page }) {
   const blockPosRef = useRef<number | null>(null)
   const [selectionCount, setSelectionCount] = useState(0)
   const [outlinePosition, setOutlinePosition] = useState<number | null>(null)
-  const [turnInto, setTurnInto] = useState(false)
   const [picker, setPicker] = useState(false)
   const [pickerQuery, setPickerQuery] = useState('')
   const [link, setLink] = useState<string | null>(null)
@@ -249,6 +311,33 @@ export function BlockEditor({ page }: { page: Page }) {
   const optionsRef = useRef<number>(0)
   const selectedRef = useRef(0)
   const editorRef = useRef<Editor | null>(null)
+  const [templateInsertion, setTemplateInsertion] = useState<{
+    editor: Editor
+    document: Editor['state']['doc']
+    range: { from: number; to: number }
+    workspaceId: string
+    remoteVersion: number
+  } | null>(null)
+  function openTemplateInsertion(range?: { from: number; to: number }) {
+    const current = editorRef.current
+    const workspace = workspaceRef.current
+    if (
+      !current ||
+      current.isDestroyed ||
+      !documentTemplatesAvailable ||
+      !workspace?.plugins.documentTemplates.enabled ||
+      workspace.ui.activeId !== page.id
+    )
+      return
+    setTemplateInsertion({
+      editor: current,
+      document: current.state.doc,
+      range: range ?? { from: current.state.selection.to, to: current.state.selection.to },
+      workspaceId: workspace.id,
+      remoteVersion,
+    })
+    dismiss()
+  }
   const [imageImport, setImageImport] = useState<{
     count: number
     resolve: (mode: 'separate' | 'slider' | null) => void
@@ -341,7 +430,13 @@ export function BlockEditor({ page }: { page: Page }) {
       return
     }
     const before = $from.parent.textBetween(0, $from.parentOffset, '\n', '\ufffc')
-    const slash = before.match(/^\/(.*)$/)
+    const inlineJira = before.match(/\/(jira(?:-[a-z]*)?)$/i)
+    const slash =
+      before.match(/^\/(.*)$/) ??
+      (inlineJira &&
+      ((inlineJira.index ?? 0) === 0 || /[\s\ufffc]/.test(before[(inlineJira.index ?? 0) - 1]))
+        ? inlineJira
+        : null)
     const wiki = before.match(/\[\[([^\]]*)$/)
     const match = slash ?? wiki
     if (!match) {
@@ -376,7 +471,6 @@ export function BlockEditor({ page }: { page: Page }) {
         BlockSelection.configure({
           handlePosition: () => blockPosRef.current,
           openMenu: (x, y, pos) => {
-            setTurnInto(false)
             setBlockMenu({ x, y, pos })
           },
           dragLabel: (count) => t('{count} blocks', { count }),
@@ -409,9 +503,14 @@ export function BlockEditor({ page }: { page: Page }) {
           if (
             !selectedBlocks(view.state).length &&
             selection instanceof NodeSelection &&
-            ['image', 'imageGallery', 'attachment', 'databaseEmbed'].includes(
-              selection.node.type.name,
-            ) &&
+            [
+              'image',
+              'imageGallery',
+              'attachment',
+              'databaseEmbed',
+              'architectureEmbed',
+              'jiraIssue',
+            ].includes(selection.node.type.name) &&
             !event.metaKey &&
             !event.ctrlKey &&
             !event.altKey &&
@@ -537,6 +636,42 @@ export function BlockEditor({ page }: { page: Page }) {
   )
   editorRef.current = editor
   useEffect(() => {
+    const shortcut = (event: KeyboardEvent) => {
+      if (
+        event.defaultPrevented ||
+        event.isComposing ||
+        !(event.metaKey || event.ctrlKey) ||
+        !event.shiftKey ||
+        event.altKey ||
+        (event.code !== 'KeyT' && event.key.toLowerCase() !== 't')
+      )
+        return
+      if (
+        !editor ||
+        editor.isDestroyed ||
+        workspaceRef.current?.ui.activeId !== page.id ||
+        !documentTemplatesAvailable ||
+        !workspaceRef.current.plugins.documentTemplates.enabled ||
+        document.querySelector('[role="dialog"][aria-modal="true"]')
+      )
+        return
+      if (
+        event.target instanceof Element &&
+        event.target.closest('input,textarea,select') &&
+        !event.target.matches('.page-title')
+      )
+        return
+      event.preventDefault()
+      openTemplateInsertion()
+    }
+    window.addEventListener('keydown', shortcut)
+    return () => window.removeEventListener('keydown', shortcut)
+  }, [editor, page.id, remoteVersion])
+  useEffect(() => {
+    if (!documentTemplatesAvailable || !w?.plugins.documentTemplates.enabled)
+      setTemplateInsertion(null)
+  }, [w?.plugins.documentTemplates.enabled])
+  useEffect(() => {
     if (lastRemoteVersion.current === remoteVersion) return
     lastRemoteVersion.current = remoteVersion
     if (
@@ -586,10 +721,17 @@ export function BlockEditor({ page }: { page: Page }) {
       document.removeEventListener('drop', drop, true)
     }
   }, [editor])
-  const commandOptions = commands.filter((c) =>
-    (c.name + ' ' + t(c.name) + ' ' + c.keywords)
-      .toLowerCase()
-      .includes(palette?.query.toLowerCase() ?? ''),
+  const commandOptions = commands.filter(
+    (c) =>
+      (!['jira', 'jira-inline'].includes(c.id) || w!.plugins.jira.enabled) &&
+      (c.id !== 'commands' || w!.plugins.commandBuilder.enabled) &&
+      (!['template', 'templates'].includes(c.id) ||
+        (documentTemplatesAvailable && w!.plugins.documentTemplates.enabled)) &&
+      (c.id !== 'data' || w!.plugins.dataTools.enabled) &&
+      (c.id !== 'architecture' || w!.plugins.projectArchitecture.enabled) &&
+      (c.name + ' ' + t(c.name) + ' ' + c.keywords)
+        .toLowerCase()
+        .includes(palette?.query.toLowerCase() ?? ''),
   )
   const pageOptions = w!.pages
     .filter(
@@ -607,10 +749,32 @@ export function BlockEditor({ page }: { page: Page }) {
   const execute = (id: string) => {
     if (!editor) return
     const p = paletteRef.current
+    if (id === 'template' && documentTemplatesAvailable && w!.plugins.documentTemplates.enabled) {
+      openTemplateInsertion(p ? { from: p.from, to: p.to } : undefined)
+      return
+    }
     if (p) editor.chain().focus().deleteRange({ from: p.from, to: p.to }).run()
     dismiss()
     const chain = editor.chain().focus()
     if (id === 'text') chain.setParagraph().run()
+    else if (id === 'jira' && w!.plugins.jira.enabled)
+      chain
+        .insertContent({
+          type: 'jiraIssue',
+          attrs: { inlineOrigin: jiraInlineOrigin(editor.state, editor.state.selection.from) },
+        })
+        .run()
+    else if (id === 'jira-inline' && w!.plugins.jira.enabled)
+      chain.insertContent({ type: 'jiraIssueInline', attrs: { display: 'minimal' } }).run()
+    else if (id === 'commands' && w!.plugins.commandBuilder.enabled)
+      openPage(commandBuilderTab, true)
+    else if (
+      id === 'templates' &&
+      documentTemplatesAvailable &&
+      w!.plugins.documentTemplates.enabled
+    )
+      openPage(documentTemplatesTab, true)
+    else if (id === 'data' && w!.plugins.dataTools.enabled) openPage(dataToolsTab, true)
     else if (/^h[1-4]$/.test(id)) chain.setHeading({ level: Number(id[1]) as 1 | 2 | 3 | 4 }).run()
     else if (id === 'todo') chain.toggleTaskList().run()
     else if (id === 'bullet') chain.toggleBulletList().run()
@@ -627,7 +791,14 @@ export function BlockEditor({ page }: { page: Page }) {
         .run()
     else if (id === 'divider') chain.setHorizontalRule().run()
     else if (id === 'code') chain.setCodeBlock().run()
-    else if (id === 'mermaid') {
+    else if (id === 'architecture' && w!.plugins.projectArchitecture.enabled) {
+      const child = newPage(page.id, 'architecture', null, false)
+      const title = t('Untitled architecture')
+      editPage(child.id, { title })
+      chain
+        .insertContent({ type: 'architectureEmbed', attrs: { pageId: child.id, label: title } })
+        .run()
+    } else if (id === 'mermaid') {
       const graph = parseFlowchart(defaultDiagramSource)!
       graph.nodes.forEach((node) => {
         node.label = t(node.label)
@@ -713,7 +884,7 @@ export function BlockEditor({ page }: { page: Page }) {
         const top = scroll.getBoundingClientRect().top + 48
         let active: number | null = null
         editor.state.doc.descendants((node, pos) => {
-          if (node.type.name !== 'heading' || !node.textContent.trim()) return
+          if (node.type.name !== 'heading' || !jiraEditorText(node).trim()) return
           const element = editor.view.nodeDOM(pos)
           if (!(element instanceof HTMLElement) || !element.getClientRects().length) return
           if (active === null || element.getBoundingClientRect().top <= top) active = pos
@@ -746,8 +917,8 @@ export function BlockEditor({ page }: { page: Page }) {
   const headings: { pos: number; level: number; title: string }[] = []
   if (w?.ui.showOutline) {
     editor.state.doc.descendants((node, pos) => {
-      if (node.type.name === 'heading' && node.textContent.trim())
-        headings.push({ pos, level: node.attrs.level, title: node.textContent })
+      if (node.type.name === 'heading' && jiraEditorText(node).trim())
+        headings.push({ pos, level: node.attrs.level, title: jiraEditorText(node) })
     })
   }
   const blockAction = (action: string) => {
@@ -825,7 +996,8 @@ export function BlockEditor({ page }: { page: Page }) {
             {
               type: 'text',
               text:
-                node.textContent ||
+                (node.type.name === 'jiraIssue' ? plainText(node.toJSON()) : '') ||
+                jiraEditorText(node) ||
                 String(node.attrs.source ?? node.attrs.latex ?? node.attrs.label ?? ''),
             },
           ].filter((n) => n.text)
@@ -839,7 +1011,13 @@ export function BlockEditor({ page }: { page: Page }) {
               ? {
                   type: 'codeBlock',
                   content: [
-                    { type: 'text', text: node.textContent || String(node.attrs.latex ?? '') },
+                    {
+                      type: 'text',
+                      text:
+                        (node.type.name === 'jiraIssue' ? plainText(node.toJSON()) : '') ||
+                        jiraEditorText(node) ||
+                        String(node.attrs.latex ?? ''),
+                    },
                   ].filter((n) => n.text),
                 }
               : id === 'quote'
@@ -867,7 +1045,6 @@ export function BlockEditor({ page }: { page: Page }) {
       editor.view.dispatch(closeHistory(editor.state.tr))
     }
     setBlockMenu(null)
-    setTurnInto(false)
     editor.commands.focus()
   }
   const insertBlock = (before: boolean) => {
@@ -1041,7 +1218,6 @@ export function BlockEditor({ page }: { page: Page }) {
                 return
               }
               const rect = e.currentTarget.getBoundingClientRect()
-              setTurnInto(false)
               setBlockMenu({
                 x: (e.detail === 0 ? rect.right : e.clientX) + 8,
                 y: e.detail === 0 ? rect.top : e.clientY,
@@ -1122,6 +1298,41 @@ export function BlockEditor({ page }: { page: Page }) {
           </nav>
         )}
       </div>
+      {documentTemplatesAvailable && templateInsertion && w!.plugins.documentTemplates.enabled && (
+        <CreateTemplatePageDialog
+          insert={{
+            page,
+            apply: (content) => {
+              const request = templateInsertion
+              const current = editorRef.current
+              if (
+                !current ||
+                current.isDestroyed ||
+                current !== request.editor ||
+                workspaceRef.current?.id !== request.workspaceId ||
+                workspaceRef.current.ui.activeId !== page.id ||
+                remoteVersion !== request.remoteVersion ||
+                !current.state.doc.eq(request.document)
+              )
+                return false
+              const transaction = templateTransaction(current.state, content, request.range)
+              validateEditorDocument(transaction.doc.toJSON() as DocNode)
+              current.view.dispatch(transaction)
+              current.view.dispatch(closeHistory(current.state.tr))
+              current.view.focus()
+              return true
+            },
+          }}
+          onClose={() => {
+            setTemplateInsertion(null)
+            if (editorRef.current && !editorRef.current.isDestroyed) editorRef.current.view.focus()
+          }}
+          onManage={() => {
+            setTemplateInsertion(null)
+            openPage(documentTemplatesSettingsTab, true)
+          }}
+        />
+      )}
       {imageImport && (
         <Modal title={t('Insert images')} onClose={() => imageImport.resolve(null)}>
           <div className="modal-content">
@@ -1209,16 +1420,16 @@ export function BlockEditor({ page }: { page: Page }) {
         <BlockMenu
           x={blockMenu.x}
           y={blockMenu.y}
-          expanded={turnInto}
           onClose={() => {
             setBlockMenu(null)
-            setTurnInto(false)
           }}
         >
-          {turnInto ? (
-            <>
-              <MenuItem onClick={() => setTurnInto(false)}>{t('← Block actions')}</MenuItem>
-              <div className="menu-separator" />
+          {selectionCount > 1 ? (
+            <div className="popover-title">
+              {t('{count} blocks selected', { count: selectionCount })}
+            </div>
+          ) : (
+            <BlockSubmenu label={t('Turn into…')} icon={<Type size={15} />}>
               {commands
                 .filter((c) =>
                   [
@@ -1238,58 +1449,47 @@ export function BlockEditor({ page }: { page: Page }) {
                 .map((c) => (
                   <MenuItem
                     key={c.id}
+                    role="menuitem"
                     icon={<c.icon size={15} />}
                     onClick={() => blockAction('type:' + c.id)}
                   >
                     {t(c.name)}
                   </MenuItem>
                 ))}
-            </>
-          ) : (
-            <>
-              {selectionCount > 1 ? (
-                <div className="popover-title">
-                  {t('{count} blocks selected', { count: selectionCount })}
-                </div>
-              ) : (
-                <MenuItem icon={<Type size={15} />} onClick={() => setTurnInto(true)}>
-                  {t('Turn into…')}
-                </MenuItem>
-              )}
-              {selectionCount > 1 &&
-                blockNodes(editor.state.doc, selectedBlocks(editor.state)).every((b) =>
-                  ['image', 'imageGallery'].includes(b.node.type.name),
-                ) && (
-                  <MenuItem icon={<ImageIcon size={15} />} onClick={() => blockAction('gallery')}>
-                    {t('Combine into slider')}
-                  </MenuItem>
-                )}
-              {selectionCount < 2 && codeCommentSelection(editor.state)?.pos === blockMenu.pos && (
-                <MenuItem
-                  icon={<MessageSquare size={15} />}
-                  onClick={() => {
-                    setBlockMenu(null)
-                    requestCodeComment(editor.view)
-                  }}
-                >
-                  {t('Add comment')}
-                </MenuItem>
-              )}
-              <MenuItem icon={<ArrowUp size={15} />} onClick={() => blockAction('up')}>
-                {t('Move up')}
-              </MenuItem>
-              <MenuItem icon={<ArrowDown size={15} />} onClick={() => blockAction('down')}>
-                {t('Move down')}
-              </MenuItem>
-              <MenuItem icon={<Copy size={15} />} onClick={() => blockAction('duplicate')}>
-                {t('Duplicate')}
-              </MenuItem>
-              <div className="menu-separator" />
-              <MenuItem danger icon={<Trash2 size={15} />} onClick={() => blockAction('delete')}>
-                {t(selectionCount > 1 ? 'Delete blocks' : 'Delete block')}
-              </MenuItem>
-            </>
+            </BlockSubmenu>
           )}
+          {selectionCount > 1 &&
+            blockNodes(editor.state.doc, selectedBlocks(editor.state)).every((b) =>
+              ['image', 'imageGallery'].includes(b.node.type.name),
+            ) && (
+              <MenuItem icon={<ImageIcon size={15} />} onClick={() => blockAction('gallery')}>
+                {t('Combine into slider')}
+              </MenuItem>
+            )}
+          {selectionCount < 2 && codeCommentSelection(editor.state)?.pos === blockMenu.pos && (
+            <MenuItem
+              icon={<MessageSquare size={15} />}
+              onClick={() => {
+                setBlockMenu(null)
+                requestCodeComment(editor.view)
+              }}
+            >
+              {t('Add comment')}
+            </MenuItem>
+          )}
+          <MenuItem icon={<ArrowUp size={15} />} onClick={() => blockAction('up')}>
+            {t('Move up')}
+          </MenuItem>
+          <MenuItem icon={<ArrowDown size={15} />} onClick={() => blockAction('down')}>
+            {t('Move down')}
+          </MenuItem>
+          <MenuItem icon={<Copy size={15} />} onClick={() => blockAction('duplicate')}>
+            {t('Duplicate')}
+          </MenuItem>
+          <div className="menu-separator" />
+          <MenuItem danger icon={<Trash2 size={15} />} onClick={() => blockAction('delete')}>
+            {t(selectionCount > 1 ? 'Delete blocks' : 'Delete block')}
+          </MenuItem>
         </BlockMenu>
       )}
       {picker && (

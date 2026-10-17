@@ -1,8 +1,82 @@
 import { z } from 'zod'
-import { builtinTools, builtinToolsV1 } from './pluginTools'
+import { builtinTools, builtinToolsV1, builtinToolsV2 } from './pluginTools'
+import { jiraPluginSchema } from './jira'
+import { documentTemplatesPluginSchema } from './documentTemplates'
+import { projectArchitecturePluginSchema } from './projectArchitecture'
 
 export const commandBuilderTab = 'plugin:command-builder' as const
 export const commandBuilderSettingsTab = 'plugin:command-builder-settings' as const
+export const jiraSettingsTab = 'plugin:jira-settings' as const
+export const mcpSettingsTab = 'plugin:mcp-settings' as const
+export const filePreviewSettingsTab = 'plugin:file-preview-settings' as const
+export const documentTemplatesTab = 'plugin:document-templates' as const
+export const documentTemplatesSettingsTab = 'plugin:document-templates-settings' as const
+export const documentTemplatesAvailable = true
+export function isPluginTabVisible(id: string) {
+  return (
+    id !== projectArchitectureTab &&
+    (documentTemplatesAvailable ||
+      (id !== documentTemplatesTab && id !== documentTemplatesSettingsTab))
+  )
+}
+export const dataToolsTab = 'plugin:data-tools' as const
+export const dataToolsSettingsTab = 'plugin:data-tools-settings' as const
+export const projectArchitectureTab = 'plugin:project-architecture' as const
+export const projectArchitectureSettingsTab = 'plugin:project-architecture-settings' as const
+export const pluginAppTabs = [
+  commandBuilderTab,
+  documentTemplatesTab,
+  dataToolsTab,
+  projectArchitectureTab,
+] as const
+export const pluginSettingsTabs = [
+  commandBuilderSettingsTab,
+  jiraSettingsTab,
+  mcpSettingsTab,
+  filePreviewSettingsTab,
+  documentTemplatesSettingsTab,
+  dataToolsSettingsTab,
+  projectArchitectureSettingsTab,
+] as const
+export function isPluginSettingsTab(id: string): id is (typeof pluginSettingsTabs)[number] {
+  return (pluginSettingsTabs as readonly string[]).includes(id)
+}
+export function pluginSettingsTitle(id: (typeof pluginSettingsTabs)[number]) {
+  return id === jiraSettingsTab
+    ? 'Jira settings'
+    : id === mcpSettingsTab
+      ? 'MCP settings'
+      : id === filePreviewSettingsTab
+        ? 'File preview settings'
+        : id === documentTemplatesSettingsTab
+          ? 'Template library'
+          : id === dataToolsSettingsTab
+            ? 'Data tools settings'
+            : id === projectArchitectureSettingsTab
+              ? 'Architecture settings'
+              : 'Tool configuration'
+}
+export function isPluginAppTab(id: string): id is (typeof pluginAppTabs)[number] {
+  return (pluginAppTabs as readonly string[]).includes(id)
+}
+export function pluginAppTitle(id: (typeof pluginAppTabs)[number]) {
+  return id === commandBuilderTab
+    ? 'Command builder'
+    : id === documentTemplatesTab
+      ? 'Document templates'
+      : id === projectArchitectureTab
+        ? 'Project architecture'
+        : 'Data tools'
+}
+export function pluginAppEnabled(plugins: z.infer<typeof pluginsSchema>, id: string) {
+  return id === commandBuilderTab
+    ? plugins.commandBuilder.enabled
+    : id === documentTemplatesTab
+      ? plugins.documentTemplates.enabled
+      : id === projectArchitectureTab
+        ? plugins.projectArchitecture.enabled
+        : id === dataToolsTab && plugins.dataTools.enabled
+}
 export const pluginJsonLimit = 1024 * 1024
 const identifier = z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/)
 const token = z
@@ -99,12 +173,32 @@ export const defaultCommandBuilderConfig = (): CommandBuilderConfig =>
     pluginId: 'command-builder',
     tools: builtinTools,
   })
-const currentCatalogRevision = 2
+const currentCatalogRevision = 3
 const originalTools = new Map(
   builtinToolsV1.map((tool) => [tool.id, commandToolSchema.parse(tool)]),
 )
+const previousTools = new Map(
+  builtinToolsV2.map((tool) => [tool.id, commandToolSchema.parse(tool)]),
+)
 const updatedTools = new Map(builtinTools.map((tool) => [tool.id, commandToolSchema.parse(tool)]))
 export const pluginsSchema = z.object({
+  projectArchitecture: projectArchitecturePluginSchema,
+  documentTemplates: documentTemplatesPluginSchema,
+  dataTools: z
+    .object({
+      enabled: z.boolean().default(false),
+      indent: z.union([z.literal(2), z.literal(4)]).default(2),
+      csvDelimiter: z.enum([',', ';', '\t']).default(','),
+    })
+    .default({ enabled: false, indent: 2, csvDelimiter: ',' }),
+  filePreview: z
+    .object({
+      enabled: z.boolean().default(false),
+      pdfFit: z.enum(['height', 'width']).default('height'),
+      pdfNavigation: z.boolean().default(false),
+    })
+    .default({ enabled: false, pdfFit: 'height', pdfNavigation: false }),
+  jira: jiraPluginSchema,
   commandBuilder: z
     .object({
       enabled: z.boolean().default(false),
@@ -118,6 +212,7 @@ export const pluginsSchema = z.object({
     }))
     .transform((plugin) => {
       if (plugin.catalogRevision === currentCatalogRevision) return plugin
+      const baseline = plugin.catalogRevision === 1 ? originalTools : previousTools
       // Upgrade only untouched built-ins once. Never restore deletions or overwrite custom/imported data.
       return {
         ...plugin,
@@ -125,7 +220,7 @@ export const pluginsSchema = z.object({
         config: {
           ...plugin.config,
           tools: plugin.config.tools.map((tool) =>
-            JSON.stringify(tool) === JSON.stringify(originalTools.get(tool.id))
+            JSON.stringify(tool) === JSON.stringify(baseline.get(tool.id))
               ? structuredClone(updatedTools.get(tool.id)!)
               : tool,
           ),

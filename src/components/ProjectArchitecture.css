@@ -1,0 +1,1483 @@
+.architecture-page {
+  max-width: 1420px;
+  margin: 0 auto;
+  padding: 28px 32px 48px;
+  container-type: inline-size;
+}
+.architecture-heading,
+.architecture-heading-actions,
+.architecture-project-bar,
+.architecture-main-toolbar,
+.architecture-toolbar-actions,
+.architecture-view-bar,
+.architecture-export-actions,
+.architecture-sites-title,
+.architecture-object-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.architecture-heading {
+  justify-content: space-between;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+.architecture-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.architecture-heading h1 {
+  margin: 6px 0 0;
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.6px;
+}
+.architecture-project-bar {
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+.architecture-project-bar > label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.architecture-project-bar .database-picker {
+  min-width: 180px;
+  max-width: 320px;
+  color: var(--text);
+  background: var(--canvas);
+}
+.architecture-project-bar .database-picker > span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+.architecture-modal input,
+.architecture-modal textarea {
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--canvas);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  padding: 8px 10px;
+  min-width: 0;
+}
+.architecture-balances {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(142px, 1fr));
+  gap: 10px;
+  margin-bottom: 18px;
+}
+.architecture-balances[hidden],
+.architecture-object-resources[hidden] {
+  display: none;
+}
+.architecture-form-body .database-picker {
+  width: 100%;
+  font-size: 13px;
+  padding: 8px 10px;
+  min-height: 35px;
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+.architecture-form-body .database-picker > span {
+  flex: 1;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.architecture-form-body .architecture-add-disk {
+  width: auto;
+  border-style: dashed;
+}
+.architecture-disk-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 130px 28px;
+  align-items: end;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.architecture-disk-row .database-picker,
+.architecture-disk-row input {
+  height: 35px;
+}
+.architecture-disk-row > .icon-button {
+  margin-bottom: 3.5px;
+}
+.architecture-disk-name {
+  grid-column: 1 / -1;
+}
+.architecture-compute-inputs {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.architecture-form-section {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+.architecture-form-section > summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  list-style: none;
+}
+.architecture-form-section > summary::-webkit-details-marker {
+  display: none;
+}
+.architecture-form-section > summary::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-right: 1.5px solid var(--muted);
+  border-bottom: 1.5px solid var(--muted);
+  transform: rotate(-45deg);
+}
+.architecture-form-section[open] > summary::before {
+  transform: rotate(45deg);
+}
+.architecture-form-section > summary > span {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 400;
+}
+.architecture-form-section > div {
+  margin-top: 12px;
+}
+.architecture-os-field {
+  display: flex;
+  gap: 6px;
+}
+.architecture-form-body .architecture-os-picker {
+  width: 36px;
+  padding: 8px;
+  flex-shrink: 0;
+}
+.architecture-os-picker > span {
+  display: none;
+}
+.architecture-mermaid-source {
+  width: 100%;
+  min-height: 320px;
+  max-height: 55vh;
+  resize: vertical;
+  font:
+    12px/1.7 ui-monospace,
+    monospace !important;
+  white-space: pre;
+}
+.architecture-selection-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  font-size: 12px;
+}
+.architecture-selection-actions > span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.architecture-diagram {
+  position: relative;
+}
+.architecture-diagram-canvas {
+  position: absolute;
+  inset: 0;
+}
+.architecture-diagram-canvas > div {
+  height: 100%;
+}
+.architecture-connection-draft {
+  position: absolute;
+  inset: 0;
+  height: 100% !important;
+  pointer-events: none;
+}
+.architecture-connection-draft path {
+  fill: none;
+  stroke: var(--link);
+  stroke-width: 2;
+  stroke-dasharray: 5 4;
+}
+.architecture-diagram [data-architecture-object] {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.architecture-diagram [data-architecture-object]:active {
+  cursor: grabbing;
+}
+.architecture-diagram [data-architecture-object].is-dragging {
+  opacity: 0.4;
+}
+.architecture-diagram [data-architecture-site].drop-active > rect,
+.architecture-diagram [data-architecture-object].connecting > rect {
+  stroke: var(--link);
+  stroke-width: 2.5;
+}
+.architecture-diagram [data-architecture-connect] {
+  cursor: crosshair;
+}
+.architecture-diagram [data-architecture-add],
+.architecture-diagram [data-architecture-link] {
+  cursor: pointer;
+}
+.architecture-diagram [data-architecture-link]:hover .architecture-link-line,
+.architecture-diagram [data-architecture-link]:focus .architecture-link-line,
+.architecture-diagram [data-architecture-link].selected .architecture-link-line {
+  stroke: var(--link);
+  stroke-width: 2.5;
+}
+.architecture-diagram [data-architecture-link].selected text {
+  fill: var(--link);
+}
+.architecture-drag-ghost {
+  position: absolute;
+  pointer-events: none;
+  background: var(--canvas);
+  border: 1px solid var(--link);
+  box-shadow: var(--shadow);
+  border-radius: 7px;
+  padding: 10px 14px;
+  font-size: 12px;
+  z-index: 2;
+}
+.architecture-object-drag {
+  display: flex;
+  padding: 0;
+  border: 0;
+  color: var(--muted);
+  background: transparent;
+  cursor: grab;
+  flex-shrink: 0;
+}
+.architecture-sites > button.drop-active {
+  outline: 2px solid var(--link);
+  background: var(--sage);
+}
+.architecture-object-links > button {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  text-align: left;
+  color: var(--muted);
+  font-size: 11px;
+}
+.architecture-balance {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  background: var(--canvas);
+}
+.architecture-balance > div:first-child {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+}
+.architecture-balance > div:first-child span {
+  color: var(--muted);
+  white-space: nowrap;
+}
+.architecture-balance strong {
+  overflow-wrap: anywhere;
+}
+.architecture-balance p {
+  margin: 12px 0 10px;
+  font-size: 24px;
+  font-variant-numeric: tabular-nums;
+}
+.architecture-balance p > span {
+  font-size: 13px;
+  color: var(--muted);
+}
+.architecture-meter {
+  height: 4px;
+  background: var(--border-light);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.architecture-meter > span {
+  display: block;
+  height: 100%;
+  background: var(--secondary);
+  border-radius: inherit;
+}
+.architecture-balance > small {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  margin-top: 9px;
+}
+.architecture-balance.over {
+  border-color: var(--tag-pink-text);
+}
+.architecture-balance.over small,
+.architecture-over {
+  color: var(--tag-pink-text);
+}
+.architecture-balance.over .architecture-meter > span {
+  background: var(--tag-pink-text);
+}
+.architecture-warning {
+  padding: 10px 14px;
+  border-radius: 7px;
+  color: var(--tag-pink-text);
+  background: var(--tag-pink-bg);
+  font-size: 12px;
+}
+.architecture-workbench {
+  display: grid;
+  grid-template-columns: 196px minmax(0, 1fr);
+  gap: 24px;
+  border-top: 1px solid var(--border);
+  padding-top: 22px;
+}
+.architecture-sites {
+  min-width: 0;
+}
+.architecture-sites-title {
+  justify-content: space-between;
+  font-size: 12px;
+  padding: 0 8px 10px;
+}
+.architecture-sites > button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  padding: 10px;
+  border-radius: 7px;
+  margin-bottom: 3px;
+  color: var(--secondary);
+  font-size: 12px;
+}
+.architecture-sites > button:hover {
+  background: var(--hover);
+}
+.architecture-sites > button.selected {
+  background: var(--sage);
+  color: var(--text);
+}
+.architecture-sites > button svg {
+  flex-shrink: 0;
+}
+.architecture-sites > button > span {
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+.architecture-sites > button > small {
+  color: var(--muted);
+}
+.architecture-main {
+  min-width: 0;
+}
+.architecture-main-toolbar {
+  justify-content: space-between;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+.architecture-main-toolbar h2 {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 0 0 4px;
+  overflow-wrap: anywhere;
+}
+.architecture-view-bar {
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 12px;
+  margin-bottom: 16px;
+}
+.architecture-view-switch {
+  display: flex;
+  background: var(--sidebar);
+  padding: 3px;
+  border-radius: 7px;
+  gap: 2px;
+}
+.architecture-view-switch button {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  padding: 6px 12px;
+  font-size: 12px;
+  border-radius: 5px;
+}
+.architecture-view-switch button[aria-pressed='true'] {
+  color: var(--text);
+  background: var(--canvas);
+  box-shadow: 0 1px 3px #0000000a;
+}
+.architecture-empty {
+  min-height: 240px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 12px;
+  padding: 28px;
+  color: var(--muted);
+}
+.architecture-empty h2,
+.architecture-empty h3 {
+  margin: 0;
+  color: var(--text);
+  font-weight: 500;
+}
+.architecture-empty p {
+  max-width: 420px;
+  margin: 0 0 8px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.architecture-object-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  gap: 14px;
+}
+.architecture-object-card {
+  border: 1px solid var(--border);
+  padding: 16px;
+  border-radius: 10px;
+  min-width: 0;
+  align-self: start;
+}
+.architecture-object-header {
+  gap: 7px;
+}
+.architecture-object-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: var(--subtle);
+  flex-shrink: 0;
+}
+.architecture-object-name {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+  padding: 0 4px;
+  border: 0;
+  color: var(--text);
+  background: transparent;
+  text-align: left;
+}
+.architecture-object-name strong {
+  font-size: 14px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.architecture-object-name > span {
+  color: var(--muted);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.architecture-object-os {
+  margin: 14px 0 10px;
+  font-size: 12px;
+  color: var(--secondary);
+  overflow-wrap: anywhere;
+}
+.architecture-object-resources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+.architecture-object-resources > span {
+  padding: 5px 7px;
+  background: var(--subtle);
+  color: var(--secondary);
+  border-radius: 5px;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.architecture-object-card dl {
+  margin: 14px 0 0;
+  font-size: 12px;
+}
+.architecture-object-card dl > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr);
+  gap: 10px;
+  padding: 5px 0;
+}
+.architecture-object-card dt {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.architecture-object-card dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.architecture-object-links {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-light);
+  font-size: 11px;
+  color: var(--muted);
+}
+.architecture-object-links span {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  overflow-wrap: anywhere;
+}
+.architecture-diagram-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.architecture-diagram-controls > div {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  flex-shrink: 0;
+}
+.architecture-diagram {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  height: clamp(320px, 65vh, 700px);
+  background: var(--canvas);
+  touch-action: none;
+  user-select: none;
+}
+.architecture-diagram svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.architecture-diagram.tool-hand,
+.architecture-diagram.tool-hand * {
+  cursor: grab !important;
+}
+.architecture-diagram.is-panning,
+.architecture-diagram.is-panning * {
+  cursor: grabbing !important;
+}
+.architecture-selection-actions .icon-button[aria-pressed='true'] {
+  background: var(--hover);
+  color: var(--text);
+}
+.architecture-diagram [data-architecture-object]:hover > rect,
+.architecture-diagram [data-architecture-object]:focus > rect {
+  stroke: var(--text);
+  stroke-width: 2;
+}
+.architecture-modal {
+  max-height: calc(100vh - 90px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.architecture-modal > header {
+  flex-shrink: 0;
+}
+.architecture-modal form {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+.architecture-form-body {
+  padding: 22px 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow: auto;
+}
+.architecture-form-body label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--secondary);
+  min-width: 0;
+}
+.architecture-form-body input,
+.architecture-form-body textarea {
+  width: 100%;
+}
+.architecture-form-body p {
+  margin: 0;
+  line-height: 1.6;
+}
+.architecture-form-body fieldset {
+  margin: 0;
+  padding: 14px 0 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+  min-width: 0;
+}
+.architecture-form-body legend {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 0 10px 0 0;
+}
+.architecture-two-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.architecture-budget-head,
+.architecture-budget-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 0.8fr) minmax(0, 1fr) 28px;
+  align-items: center;
+  gap: 10px;
+}
+.architecture-budget-head {
+  color: var(--muted);
+  font-size: 11px;
+}
+.architecture-budget-row {
+  margin-top: -6px;
+}
+.architecture-resource-inputs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 14px;
+}
+.architecture-resource-inputs small {
+  font-size: 10px;
+}
+.architecture-parameter-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr) 28px;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.architecture-form-body > .button,
+.architecture-form-body fieldset > .button {
+  align-self: start;
+}
+.architecture-form-body fieldset > p {
+  margin-top: 10px;
+}
+.architecture-modal .modal-actions {
+  flex-shrink: 0;
+  padding: 16px 26px;
+  margin: 0;
+  border-top: 1px solid var(--border);
+}
+@container (max-width: 780px) {
+  .architecture-workbench {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .architecture-sites {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+  .architecture-sites-title {
+    padding: 0;
+    margin-right: 6px;
+  }
+  .architecture-sites > button {
+    width: auto;
+    max-width: 100%;
+    margin: 0;
+  }
+  .architecture-balances {
+    grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+  }
+}
+@media (max-width: 800px) {
+  .architecture-page {
+    padding: 20px 18px 32px;
+  }
+  .architecture-form-body {
+    padding: 18px;
+  }
+  .architecture-budget-head,
+  .architecture-budget-row {
+    gap: 5px;
+  }
+  .architecture-budget-row input,
+  .architecture-budget-row .database-picker {
+    padding: 8px 5px;
+  }
+}
+.architecture-color-swatch {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+}
+.architecture-group-members {
+  max-height: 250px;
+  overflow: auto;
+}
+.architecture-form-body .architecture-group-members label {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 0;
+}
+.architecture-group-members input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+.architecture-group-members label > span {
+  overflow-wrap: anywhere;
+}
+.architecture-group-members small {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+}
+.architecture-group-delete {
+  margin-right: auto;
+}
+.architecture-diagram [data-architecture-group].drop-active > rect {
+  stroke: var(--link);
+  stroke-width: 2.5;
+}
+.architecture-diagram [data-architecture-edit-site],
+.architecture-diagram [data-architecture-edit-group],
+.architecture-diagram [data-architecture-add-group],
+.architecture-diagram [data-architecture-add-server] {
+  cursor: pointer;
+}
+.architecture-diagram [data-architecture-edit-site]:hover text,
+.architecture-diagram [data-architecture-edit-site]:focus text,
+.architecture-diagram [data-architecture-edit-group]:hover text,
+.architecture-diagram [data-architecture-edit-group]:focus text {
+  fill: var(--link);
+}
+.architecture-group-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.architecture-group-list .button {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+.architecture-group-list small {
+  color: var(--muted);
+}
+.architecture-group-list .drop-active {
+  outline: 2px solid var(--link);
+}
+.architecture-form-body .database-picker > .architecture-color-swatch,
+.database-picker-popover button > .architecture-color-swatch {
+  flex: 0 0 16px;
+  width: 16px;
+}
+/* The designer owns project/site navigation and inline properties in one tab. */
+.architecture-heading h1 .architecture-site-picker {
+  border: 0;
+  border-radius: 6px;
+  padding: 3px 4px;
+  margin-left: -4px;
+  background: transparent;
+  color: var(--text);
+  font-weight: 600;
+  max-width: 100%;
+  text-align: left;
+}
+.architecture-heading h1 .architecture-site-picker {
+  font-size: 26px;
+  letter-spacing: -0.5px;
+}
+.architecture-title-picker > svg,
+.architecture-site-picker > svg {
+  width: 19px;
+  height: 19px;
+  margin-left: 8px;
+}
+.architecture-title-picker:hover,
+.architecture-site-picker:hover {
+  background: var(--hover) !important;
+}
+.architecture-main-toolbar {
+  border-top: 1px solid var(--border);
+  padding-top: 18px;
+}
+.architecture-editor {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: 16px;
+}
+.architecture-inspector {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--canvas);
+  overflow: auto;
+  max-height: min(580px, calc(100vh - 40px));
+  min-width: 0;
+}
+.architecture-inspector > header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--canvas);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 4px 4px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+.architecture-inspector .architecture-form-body {
+  padding: 16px;
+  gap: 14px;
+}
+.architecture-inspector input:not([type='checkbox']) {
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--canvas);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  padding: 8px;
+  min-width: 0;
+}
+.architecture-inspector .architecture-two-fields {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.architecture-properties-popover {
+  width: 360px;
+  max-width: calc(100vw - 16px);
+  padding: 0;
+  overflow: hidden;
+}
+.architecture-properties-popover .architecture-inspector {
+  border: 0;
+}
+.architecture-properties-popover.is-link-label {
+  width: 300px;
+}
+.architecture-link-label-editor {
+  display: grid;
+  gap: 6px;
+  padding: 6px;
+  font-size: 12px;
+}
+.architecture-link-label-editor input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  padding: 6px;
+}
+.architecture-link-label-error {
+  width: 100%;
+  padding: 6px;
+}
+.architecture-properties-trigger {
+  cursor: pointer;
+  opacity: 0;
+}
+.architecture-diagram [data-architecture-object]:hover .architecture-properties-trigger,
+.architecture-diagram [data-architecture-object]:focus-within .architecture-properties-trigger,
+.architecture-diagram [data-architecture-site]:hover > .architecture-properties-trigger,
+.architecture-diagram [data-architecture-site]:focus-within > .architecture-properties-trigger,
+.architecture-diagram [data-architecture-group]:hover > .architecture-properties-trigger,
+.architecture-diagram [data-architecture-group]:focus-within > .architecture-properties-trigger,
+.architecture-properties-trigger:focus {
+  opacity: 1;
+}
+.architecture-properties-trigger:hover > rect,
+.architecture-properties-trigger:focus > rect {
+  fill: var(--hover);
+}
+.architecture-endpoint-handle {
+  pointer-events: all;
+  cursor: crosshair;
+}
+.architecture-endpoint-dot {
+  fill: var(--canvas);
+  stroke: var(--link);
+}
+.architecture-endpoint-handle:hover .architecture-endpoint-dot,
+.architecture-endpoint-handle:focus .architecture-endpoint-dot {
+  fill: var(--link);
+}
+.architecture-diagram [data-architecture-object].connection-target > rect {
+  stroke: var(--link);
+  stroke-width: 2.5;
+}
+.architecture-diagram [data-architecture-object].connection-target > rect {
+  fill: var(--sage);
+}
+.architecture-view-bar {
+  justify-content: flex-end;
+}
+.architecture-inspector .architecture-disk-row {
+  grid-template-columns: minmax(0, 1fr) 75px 28px;
+  gap: 8px;
+}
+.architecture-inspector .architecture-parameter-row {
+  grid-template-columns: minmax(0, 1fr) 24px;
+  gap: 6px;
+}
+.architecture-inspector .architecture-parameter-row > :nth-child(2) {
+  grid-column: 1;
+}
+.architecture-inspector .architecture-parameter-row > :last-child {
+  grid-column: 2;
+  grid-row: 1 / 3;
+}
+.architecture-form-body .architecture-os-picker {
+  width: 95px;
+  padding: 6px 8px;
+  font-size: 11px;
+}
+.architecture-os-field > input {
+  flex: 1;
+  min-width: 0;
+}
+.architecture-os-picker > span {
+  display: inline;
+}
+.architecture-os-options {
+  width: 200px !important;
+  min-width: 200px !important;
+  max-width: min(220px, calc(100vw - 16px));
+}
+.architecture-os-options [role='option'] {
+  font-size: 12px;
+}
+.architecture-display-settings {
+  width: 255px;
+  padding: 10px;
+}
+.architecture-display-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 4px;
+  font-size: 12px;
+}
+.architecture-display-settings > .button {
+  margin-top: 10px;
+  width: 100%;
+}
+.architecture-context-anchor {
+  position: fixed;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
+}
+.architecture-context-menu {
+  width: 244px;
+  padding: 5px;
+}
+.architecture-context-menu [role='menuitem'],
+.architecture-create-submenu [role='menuitem'],
+.architecture-property-submenu [role='menuitem'],
+.architecture-link-label-editor > .menu-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  border: 0;
+  border-radius: 5px;
+  padding: 9px 10px;
+  font-size: 12px;
+  color: var(--text);
+  background: transparent;
+  text-align: left;
+}
+.architecture-context-menu [role='menuitem']:hover,
+.architecture-context-menu [role='menuitem']:focus-visible {
+  background: var(--hover);
+}
+.architecture-context-menu [role='menuitem']:disabled {
+  opacity: 0.4;
+}
+.architecture-context-menu [role='menuitem'].danger {
+  color: var(--tag-pink-text);
+}
+.architecture-context-menu hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 5px 4px;
+}
+.architecture-diagram [data-architecture-object].selected > rect {
+  stroke: var(--link);
+  stroke-width: 2.5;
+}
+.architecture-diagram .architecture-port-dot {
+  opacity: 0.7;
+}
+.architecture-diagram [data-architecture-connect]:hover .architecture-port-dot,
+.architecture-diagram [data-architecture-connect]:focus .architecture-port-dot {
+  fill: var(--link);
+  opacity: 1;
+}
+.architecture-connection-draft .architecture-marquee {
+  fill: var(--sage);
+  fill-opacity: 0.5;
+  stroke: var(--link);
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+}
+.architecture-card-link {
+  margin-top: 10px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  text-align: left;
+}
+.architecture-diagram,
+.architecture-diagram [tabindex] {
+  outline: none;
+}
+.architecture-diagram.is-keyboard:focus-visible,
+.architecture-diagram.is-keyboard [tabindex]:focus-visible {
+  outline: 1px solid var(--link);
+  outline-offset: 2px;
+}
+.architecture-context-menu button:focus,
+.architecture-create-submenu button:focus {
+  outline: none;
+}
+.architecture-context-menu button:focus-visible,
+.architecture-create-submenu button:focus-visible {
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+}
+.architecture-diagram [data-architecture-edit-site],
+.architecture-diagram [data-architecture-edit-group] {
+  cursor: grab !important;
+}
+.architecture-diagram [data-architecture-object].drop-active > rect {
+  stroke: var(--link);
+  stroke-width: 3;
+}
+.architecture-alignment-guide {
+  stroke: var(--link);
+  stroke-width: 1;
+  stroke-dasharray: 5 3;
+}
+.architecture-heading h1 .architecture-site-picker {
+  display: inline-flex;
+  width: max-content;
+  height: auto;
+}
+.architecture-heading > div:first-child {
+  min-width: 0;
+  max-width: 100%;
+}
+.architecture-form-body .architecture-os-picker {
+  width: 120px;
+}
+.architecture-heading h1 .architecture-site-picker {
+  margin-left: 0;
+  padding-left: 0;
+  padding-right: 0;
+}
+.architecture-object-list {
+  grid-auto-rows: 1fr;
+  align-items: stretch;
+}
+.architecture-object-card {
+  align-self: stretch;
+}
+.architecture-card-link {
+  display: block;
+  width: 100%;
+}
+.architecture-create-submenu [role='menuitem'] {
+  font-size: 12px;
+  padding: 9px 10px;
+}
+
+/* Keep creation on the canvas; navigation/search/export share a compact row. */
+.architecture-page {
+  gap: 16px;
+}
+.architecture-heading {
+  margin-bottom: 12px;
+}
+.architecture-main-toolbar {
+  margin: 0;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+  gap: 12px;
+}
+.architecture-main-toolbar h2 {
+  margin: 0;
+}
+.architecture-main-toolbar > div:first-child {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.architecture-export-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.architecture-object-search > span {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.architecture-diagram [data-architecture-link-label] {
+  cursor: grab;
+}
+.architecture-diagram [data-architecture-link-label].is-dragging {
+  cursor: grabbing;
+}
+.architecture-diagram [data-architecture-link-label].selected text {
+  fill: var(--accent);
+}
+.architecture-diagram .connection-muted {
+  opacity: 0.22;
+}
+@media (max-width: 700px) {
+  .architecture-main-toolbar {
+    flex-wrap: wrap;
+  }
+  .architecture-export-actions {
+    margin-left: auto;
+  }
+}
+
+/* Each architecture is a page; embeds stay compact and open that page. */
+.architecture-property-submenu {
+  width: 180px;
+}
+.architecture-properties-popover {
+  width: 320px;
+}
+.architecture-inspector {
+  max-height: min(460px, calc(100vh - 32px));
+}
+.architecture-inspector .architecture-form-body {
+  padding: 12px;
+  gap: 10px;
+}
+.architecture-inspector > header .database-picker {
+  border: 0;
+  background: transparent;
+  font-weight: 600;
+  padding: 3px;
+}
+.architecture-os-section {
+  display: grid;
+  gap: 6px;
+}
+.architecture-embed {
+  margin: 16px 0;
+}
+.architecture-embed .diagram-toolbar > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.architecture-embed .diagram-toolbar {
+  visibility: visible;
+  opacity: 1;
+}
+.architecture-embed-preview {
+  padding: 8px;
+}
+.architecture-snapshot {
+  width: 100%;
+  overflow: hidden;
+}
+.architecture-snapshot > svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 360px;
+}
+.architecture-embed-preview .architecture-snapshot {
+  pointer-events: none;
+}
+.architecture-missing {
+  margin: 16px;
+  color: var(--muted);
+}
+.architecture-disabled {
+  padding: 28px 32px;
+}
+.architecture-page-print {
+  display: none;
+}
+@media print {
+  .architecture-page,
+  .architecture-disabled {
+    display: none !important;
+  }
+  .architecture-page-print {
+    display: block;
+  }
+  .architecture-embed .diagram-toolbar button {
+    display: none !important;
+  }
+  .architecture-snapshot {
+    overflow: visible;
+    --canvas: #fff;
+    --text: #303030;
+    --muted: #666;
+    --border-strong: #ccc;
+    --subtle: #fafafa;
+    --tag-blue-bg: #e8eff6;
+    --tag-green-bg: #e7f1e2;
+    --tag-purple-bg: #eeebf5;
+    --tag-amber-bg: #f7f0dd;
+    --tag-pink-bg: #f6e8e8;
+    --tag-peach-bg: #f7ecdf;
+  }
+  .architecture-snapshot > svg {
+    max-height: none;
+    break-inside: avoid;
+  }
+  .architecture-embed {
+    break-inside: avoid;
+  }
+}
+
+/* Keep scope navigation in the title and camera tools inside the editor frame. */
+.architecture-heading {
+  padding-bottom: 16px;
+  margin-bottom: 16px;
+  gap: 16px;
+}
+.architecture-heading > div:first-child {
+  flex: 1 1 220px;
+}
+.architecture-eyebrow {
+  overflow-wrap: anywhere;
+}
+.architecture-heading-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  max-width: 100%;
+}
+.architecture-diagram-workspace {
+  position: relative;
+}
+.architecture-diagram-controls {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  margin: 0;
+  pointer-events: none;
+}
+.architecture-selection-actions,
+.architecture-canvas-view {
+  position: absolute;
+  pointer-events: auto;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 3px;
+  background: var(--canvas);
+  color: var(--text);
+  box-shadow: 0 2px 10px #0000000d;
+}
+.architecture-selection-actions {
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: calc(100% - 32px);
+}
+.architecture-selection-actions > span {
+  max-width: 110px;
+}
+.architecture-canvas-view {
+  bottom: 16px;
+  left: 16px;
+  border-radius: 10px;
+  padding: 4px;
+}
+.architecture-diagram-controls .icon-button {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+}
+.architecture-canvas-view > .button {
+  height: 28px;
+  min-width: 54px;
+  padding: 0 6px;
+  border-color: transparent;
+  background: transparent;
+  font-size: 12px;
+}
+.architecture-selection-actions .icon-button[aria-pressed='true'] {
+  background: var(--primary-bg);
+  color: var(--primary-text);
+}
+
+.architecture-diagram-controls .icon-button svg {
+  width: 15px;
+  height: 15px;
+}
+.architecture-heading-actions .architecture-icon-picker {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  padding: 0;
+  justify-content: center;
+}
+.architecture-icon-picker > span {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  overflow: visible;
+}
+
+.architecture-diagram [data-architecture-group].selected > rect {
+  stroke: var(--link);
+  stroke-width: 2;
+}
+
+.architecture-diagram [data-architecture-link-bridge] {
+  cursor: pointer;
+}
+.architecture-diagram [data-architecture-link-bridge].selected .architecture-link-line,
+.architecture-diagram [data-architecture-link-bridge]:hover .architecture-link-line {
+  stroke: var(--link);
+  stroke-width: 2.5;
+}
+
+.architecture-header-icon,
+.architecture-heading-actions .architecture-icon-picker {
+  box-sizing: border-box;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--canvas);
+  color: var(--text);
+  gap: 0;
+}
+.architecture-heading-actions .architecture-header-icon svg,
+.architecture-heading-actions .architecture-icon-picker svg {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 17px;
+  overflow: visible;
+}
+.architecture-link-label-editor > input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 7px 8px;
+}
+.architecture-link-menu-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+}
+.architecture-link-menu-row > span {
+  flex: 1;
+}
+.architecture-link-label-editor .database-picker,
+.architecture-choice-menu [role='option'] {
+  font-size: 12px;
+}
+.architecture-link-label-editor > .danger {
+  border-top: 1px solid var(--border);
+  margin-top: 2px;
+}
+.architecture-context-menu:not(.is-keyboard) [role='menuitem']:focus:not(:hover) {
+  background: transparent;
+}
+.architecture-create-submenu [role='menuitem']:hover,
+.architecture-property-submenu [role='menuitem']:hover {
+  background: var(--hover);
+}
+
+.architecture-choice-menu [role='option'] {
+  min-height: 34px;
+  padding: 8px 10px;
+  line-height: 1.5;
+}
+
+.architecture-display-row > span {
+  flex: 1;
+}
+.architecture-header-icon:hover,
+.architecture-heading-actions .architecture-icon-picker:hover {
+  background: var(--hover);
+  border-color: var(--border-strong);
+}
+
+.architecture-label-rotate {
+  pointer-events: all;
+  cursor: grab;
+}
+.architecture-label-rotate:active {
+  cursor: grabbing;
+}
+.architecture-label-rotate line {
+  stroke: var(--link);
+}
+.architecture-label-rotate .architecture-rotate-dot {
+  fill: var(--canvas);
+  stroke: var(--link);
+}
+.architecture-connection-draft .architecture-label-rotate path {
+  stroke-width: 1.5;
+  stroke-dasharray: none;
+}
+.architecture-label-rotate:focus-visible .architecture-rotate-dot,
+.architecture-label-rotate:hover .architecture-rotate-dot {
+  fill: var(--hover);
+  stroke-width: 2;
+}

@@ -46,11 +46,13 @@ export function ImageCropDialog({
   src,
   initialCrop,
   onApply,
+  onReset,
   onClose,
 }: {
   src: string
   initialCrop: unknown
   onApply: (crop: CropRect, bytes: ArrayBuffer) => Promise<void>
+  onReset?: () => void
   onClose: () => void
 }) {
   const { t } = useI18n()
@@ -144,6 +146,12 @@ export function ImageCropDialog({
     >
       <div className="image-crop-dialog">
         <div className="image-crop-toolbar">
+          {onReset && (
+            <button type="button" className="crop-reset" disabled={saving} onClick={onReset}>
+              <RotateCcw size={14} />
+              {t('Reset crop')}
+            </button>
+          )}
           <button
             type="button"
             className="crop-reset"

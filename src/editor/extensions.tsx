@@ -748,7 +748,7 @@ export const WikiLink = Node.create<{
 })
 function AttachmentView({ node, editor, getPos }: NodeViewProps) {
   const { t } = useI18n()
-  const { run } = useApp()
+  const { run, openAttachment } = useApp()
   const [chooseView, setChooseView] = useState(false)
   const anchor = useRef<HTMLButtonElement>(null)
   const menu = useRef<HTMLDivElement>(null)
@@ -801,7 +801,7 @@ function AttachmentView({ node, editor, getPos }: NodeViewProps) {
             editor.view.focus()
             return
           }
-          run(() => window.sheco.openAttachment(node.attrs.id))
+          run(() => openAttachment(node.attrs.id))
         }}
       >
         <File size={display === 'tile' ? 32 : display === 'link' ? 16 : 24} />

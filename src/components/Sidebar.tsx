@@ -1,6 +1,15 @@
 import { useI18n } from '../i18n'
-import { useEffect, useRef, useState, type CSSProperties, type DragEvent } from 'react'
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type DragEvent,
+  type ReactNode,
+  type RefObject,
+} from 'react'
 import { Logo } from './Logo'
+import { SidebarUpdateNotice } from './AppUpdates'
 import {
   Search,
   Plus,
@@ -19,14 +28,85 @@ import {
   ArrowRight,
   Link,
   Download,
+  Upload,
   PanelLeftClose,
   Puzzle,
   Terminal,
+  Ticket,
+  Plug,
+  PanelsTopLeft,
+  Braces,
+  Network,
 } from 'lucide-react'
 import { useApp } from '../state'
 import { descendants, movePage, type Page } from '../shared/model'
 import { PageIcon, IconButton, MenuItem, Modal, Popover } from './ui'
-import { commandBuilderTab } from '../shared/plugins'
+import {
+  commandBuilderTab,
+  jiraSettingsTab,
+  mcpSettingsTab,
+  filePreviewSettingsTab,
+  documentTemplatesTab,
+  documentTemplatesAvailable,
+  dataToolsTab,
+  projectArchitectureSettingsTab,
+} from '../shared/plugins'
+
+function SidebarMenu({
+  anchor,
+  label,
+  onClose,
+  children,
+  side = 'bottom',
+}: {
+  anchor: RefObject<HTMLElement | null>
+  label: string
+  onClose: () => void
+  children: ReactNode
+  side?: 'bottom' | 'right'
+}) {
+  const menu = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    menu.current?.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus()
+  }, [])
+  return (
+    <Popover
+      anchor={anchor}
+      side={side}
+      align="end"
+      className="sidebar-page-menu"
+      onClose={onClose}
+    >
+      <div
+        ref={menu}
+        role="menu"
+        aria-label={label}
+        onKeyDown={(event) => {
+          const items = [
+            ...event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'),
+          ]
+          const index = items.indexOf(document.activeElement as HTMLButtonElement)
+          const next =
+            event.key === 'ArrowDown'
+              ? (index + 1) % items.length
+              : event.key === 'ArrowUp'
+                ? (index + items.length - 1) % items.length
+                : event.key === 'Home'
+                  ? 0
+                  : event.key === 'End'
+                    ? items.length - 1
+                    : -1
+          if (next < 0) return
+          event.preventDefault()
+          items[next]?.focus()
+        }}
+      >
+        {children}
+      </div>
+    </Popover>
+  )
+}
+
 export function Sidebar({
   screen,
   onNavigate,
@@ -34,6 +114,9 @@ export function Sidebar({
   onSettings,
   onCollapse,
   onPluginSettings,
+  onPluginConfigure,
+  onCreateFromTemplate,
+  onSaveAsTemplate,
 }: {
   screen: string
   onNavigate: (screen: string) => void
@@ -41,6 +124,9 @@ export function Sidebar({
   onSettings: () => void
   onCollapse: () => void
   onPluginSettings: () => void
+  onPluginConfigure: (id: string) => void
+  onCreateFromTemplate: (parentId?: string | null) => void
+  onSaveAsTemplate: (pageId: string) => void
 }) {
   const { t, language } = useI18n()
   const [resizeWidth, setResizeWidth] = useState<number | null>(null)
@@ -67,13 +153,36 @@ export function Sidebar({
     run,
     notify,
     flush,
+    importPage,
   } = useApp()
+  const [mcpEnabled, setMcpEnabled] = useState(false)
+  useEffect(() => {
+    let alive = true
+    const refresh = () =>
+      void window.sheco
+        .mcpStatus()
+        .then((s) => {
+          if (alive) setMcpEnabled(s.config.enabled)
+        })
+        .catch(() => {})
+    refresh()
+    window.addEventListener('sheco-mcp-changed', refresh)
+    return () => {
+      alive = false
+      window.removeEventListener('sheco-mcp-changed', refresh)
+    }
+  }, [])
+  const [pagesMenu, setPagesMenu] = useState(false)
+  const pagesAnchor = useRef<HTMLButtonElement>(null)
+  const [rootContext, setRootContext] = useState<{ x: number; y: number } | null>(null)
+  const rootContextAnchor = useRef<HTMLDivElement>(null)
   const [spaceMenu, setSpaceMenu] = useState(false)
   const [pluginMenu, setPluginMenu] = useState(false)
   const pluginAnchor = useRef<HTMLButtonElement>(null)
   const [newSpace, setNewSpace] = useState(false)
   const [spaceName, setSpaceName] = useState('')
-  const [context, setContext] = useState<{ page: Page; x: number; y: number } | null>(null)
+  const [context, setContext] = useState<{ page: Page } | null>(null)
+  const contextAnchor = useRef<HTMLElement>(null)
   const [rename, setRename] = useState<Page | null>(null)
   const [title, setTitle] = useState('')
   const [move, setMove] = useState<Page | null>(null)
@@ -83,6 +192,11 @@ export function Sidebar({
   } | null>(null)
   const draggingPage = useRef<string | null>(null)
   const [dragging, setDragging] = useState<string | null>(null)
+  useEffect(() => {
+    setPagesMenu(false)
+    setRootContext(null)
+    setContext(null)
+  }, [w?.id])
   if (!w || !data) return null
   const navigate = (id: string, newTab = false) => {
     openPage(id, newTab)
@@ -108,6 +222,49 @@ export function Sidebar({
     )
     onNavigate('page')
   }
+  const closePageMenus = () => {
+    setPagesMenu(false)
+    setRootContext(null)
+    setContext(null)
+  }
+  const creationItems = (parent: Page | null = null) => (
+    <>
+      <MenuItem
+        role="menuitem"
+        icon={<FilePlus2 size={15} />}
+        onClick={() => {
+          closePageMenus()
+          create(parent)
+        }}
+      >
+        {t(parent ? (parent.kind === 'database' ? 'New entry' : 'New subpage') : 'New page')}
+      </MenuItem>
+      {documentTemplatesAvailable && w.plugins.documentTemplates.enabled && (
+        <MenuItem
+          role="menuitem"
+          icon={<Copy size={15} />}
+          onClick={() => {
+            closePageMenus()
+            onCreateFromTemplate(parent?.id ?? null)
+          }}
+        >
+          {t('Page from template')}
+        </MenuItem>
+      )}
+      <MenuItem
+        role="menuitem"
+        icon={<Upload size={15} />}
+        onClick={() => {
+          closePageMenus()
+          run(async () => {
+            if (await importPage(parent?.id ?? null)) onNavigate('page')
+          })
+        }}
+      >
+        {t('Import Markdown')}
+      </MenuItem>
+    </>
+  )
   const roots = w.pages.filter((p) => !p.deletedAt && !p.parentId).sort((a, b) => a.order - b.order)
   const canDrop = (id: string, parentId: string | null) => {
     const source = w.pages.find((page) => page.id === id && !page.deletedAt)
@@ -151,6 +308,7 @@ export function Sidebar({
             'tree-row ' +
             (screen === 'page' && w.ui.activeId === page.id ? 'active ' : '') +
             (drop?.id === page.id && drop.position === 'inside' ? 'tree-drop-inside ' : '') +
+            (context?.page.id === page.id ? 'tree-menu-open ' : '') +
             (dragging === page.id ? 'tree-dragging' : '')
           }
           style={{ paddingLeft: 10 + depth * 16 }}
@@ -212,7 +370,8 @@ export function Sidebar({
           }}
           onContextMenu={(e) => {
             e.preventDefault()
-            setContext({ page, x: e.clientX, y: e.clientY })
+            contextAnchor.current = e.currentTarget.querySelector<HTMLElement>('.tree-page')
+            setContext({ page })
           }}
         >
           <button
@@ -234,7 +393,11 @@ export function Sidebar({
           <div className="tree-actions">
             <button
               aria-label={t('Options for ') + page.title}
-              onClick={(e) => setContext({ page, x: e.clientX, y: e.clientY })}
+              aria-haspopup="menu"
+              onClick={(e) => {
+                contextAnchor.current = e.currentTarget
+                setContext({ page })
+              }}
             >
               <MoreHorizontal size={15} />
             </button>
@@ -392,7 +555,19 @@ export function Sidebar({
           </Popover>
         )}
       </div>
-      <div className="sidebar-scroll">
+      <div
+        className="sidebar-scroll"
+        onContextMenu={(event) => {
+          if (event.target !== event.currentTarget) return
+          const bottom = event.currentTarget
+            .querySelector('.page-tree')
+            ?.getBoundingClientRect().bottom
+          if (bottom === undefined || event.clientY < bottom) return
+          event.preventDefault()
+          closePageMenus()
+          setRootContext({ x: event.clientX, y: event.clientY })
+        }}
+      >
         <div className="sidebar-section-label">
           <span>{t('Favorites')}</span>
           <Star size={11} />
@@ -415,16 +590,48 @@ export function Sidebar({
             <p className="sidebar-hint">{t('Star a page to keep it close.')}</p>
           )}
         </div>
-        <div className="sidebar-section-label pages-label">
+        <div
+          className="sidebar-section-label pages-label"
+          onContextMenu={(event) => {
+            event.preventDefault()
+            setPagesMenu(true)
+          }}
+        >
           <span>{t('Pages')}</span>
-          <IconButton title={t('New page')} onClick={() => create()}>
-            <Plus size={14} />
-          </IconButton>
+          <span className="sidebar-section-actions">
+            <IconButton title={t('New page')} onClick={() => create()}>
+              <Plus size={14} />
+            </IconButton>
+            <button
+              ref={pagesAnchor}
+              className="icon-button"
+              aria-label={t('Pages menu')}
+              title={t('Pages menu')}
+              aria-expanded={pagesMenu}
+              aria-haspopup="menu"
+              onClick={() => setPagesMenu(!pagesMenu)}
+            >
+              <MoreHorizontal size={14} />
+            </button>
+          </span>
+          {pagesMenu && (
+            <SidebarMenu
+              anchor={pagesAnchor}
+              label={t('New page options')}
+              onClose={() => setPagesMenu(false)}
+            >
+              {creationItems()}
+            </SidebarMenu>
+          )}
         </div>
         <div className="page-tree">{roots.map((p) => renderPage(p))}</div>
-        <button
-          className={'sidebar-add ' + (drop?.id === 'root' ? 'drop-target' : '')}
-          onClick={() => create()}
+        <div
+          className={'sidebar-empty-space' + (drop?.id === 'root' ? ' drop-target' : '')}
+          onContextMenu={(event) => {
+            event.preventDefault()
+            closePageMenus()
+            setRootContext({ x: event.clientX, y: event.clientY })
+          }}
           onDragOver={(e) => {
             if (e.dataTransfer.types.includes('application/sheco-page')) {
               const valid = !!draggingPage.current && canDrop(draggingPage.current, null)
@@ -445,12 +652,21 @@ export function Sidebar({
                 notify((error as Error).message)
               }
           }}
-        >
-          <Plus size={16} />
-          {t('New page')}
-        </button>
+        />
       </div>
       <footer className="sidebar-footer">
+        <SidebarUpdateNotice />
+        {documentTemplatesAvailable && w.plugins.documentTemplates.enabled && (
+          <button
+            className={
+              screen === 'page' && w.ui.activeId === documentTemplatesTab ? 'selected' : ''
+            }
+            onClick={() => navigate(documentTemplatesTab, true)}
+          >
+            <FilePlus2 size={15} />
+            {t('Templates')}
+          </button>
+        )}
         <button
           ref={pluginAnchor}
           aria-haspopup="menu"
@@ -459,7 +675,17 @@ export function Sidebar({
         >
           <Puzzle size={15} />
           {t('Plugins')}
-          <span>{w.plugins.commandBuilder.enabled ? '1' : ''}</span>
+          <span>
+            {[
+              w.plugins.commandBuilder.enabled,
+              w.plugins.jira.enabled,
+              w.plugins.filePreview.enabled,
+              documentTemplatesAvailable && w.plugins.documentTemplates.enabled,
+              w.plugins.dataTools.enabled,
+              w.plugins.projectArchitecture.enabled,
+              mcpEnabled,
+            ].filter(Boolean).length || ''}
+          </span>
         </button>
         {pluginMenu && (
           <Popover
@@ -468,6 +694,39 @@ export function Sidebar({
             onClose={() => setPluginMenu(false)}
           >
             <div className="popover-title">{t('Enabled plugins')}</div>
+            {documentTemplatesAvailable && w.plugins.documentTemplates.enabled && (
+              <MenuItem
+                icon={<FilePlus2 size={16} />}
+                onClick={() => {
+                  navigate(documentTemplatesTab, true)
+                  setPluginMenu(false)
+                }}
+              >
+                {t('Document templates')}
+              </MenuItem>
+            )}
+            {w.plugins.dataTools.enabled && (
+              <MenuItem
+                icon={<Braces size={16} />}
+                onClick={() => {
+                  navigate(dataToolsTab, true)
+                  setPluginMenu(false)
+                }}
+              >
+                {t('Data tools')}
+              </MenuItem>
+            )}
+            {w.plugins.projectArchitecture.enabled && (
+              <MenuItem
+                icon={<Network size={16} />}
+                onClick={() => {
+                  setPluginMenu(false)
+                  onPluginConfigure(projectArchitectureSettingsTab)
+                }}
+              >
+                {t('Project architecture')}
+              </MenuItem>
+            )}
             {w.plugins.commandBuilder.enabled ? (
               <MenuItem
                 icon={<Terminal size={16} />}
@@ -478,9 +737,47 @@ export function Sidebar({
               >
                 {t('Command builder')}
               </MenuItem>
-            ) : (
-              <p className="plugins-menu-empty">{t('No plugins enabled')}</p>
+            ) : null}
+            {w.plugins.jira.enabled && (
+              <MenuItem
+                icon={<Ticket size={16} />}
+                onClick={() => {
+                  setPluginMenu(false)
+                  onPluginConfigure(jiraSettingsTab)
+                }}
+              >
+                Jira
+              </MenuItem>
             )}
+            {w.plugins.filePreview.enabled && (
+              <MenuItem
+                icon={<PanelsTopLeft size={16} />}
+                onClick={() => {
+                  setPluginMenu(false)
+                  onPluginConfigure(filePreviewSettingsTab)
+                }}
+              >
+                {t('File preview')}
+              </MenuItem>
+            )}
+            {mcpEnabled && (
+              <MenuItem
+                icon={<Plug size={16} />}
+                onClick={() => {
+                  setPluginMenu(false)
+                  onPluginConfigure(mcpSettingsTab)
+                }}
+              >
+                {t('AI agents · MCP')}
+              </MenuItem>
+            )}
+            {!w.plugins.commandBuilder.enabled &&
+              !(documentTemplatesAvailable && w.plugins.documentTemplates.enabled) &&
+              !w.plugins.dataTools.enabled &&
+              !w.plugins.projectArchitecture.enabled &&
+              !w.plugins.jira.enabled &&
+              !w.plugins.filePreview.enabled &&
+              !mcpEnabled && <p className="plugins-menu-empty">{t('No plugins enabled')}</p>}
             <div className="menu-separator" />
             <MenuItem
               icon={<Settings size={15} />}
@@ -506,105 +803,133 @@ export function Sidebar({
           {t('Settings')}
         </button>
       </footer>
-      {context && (
+      {rootContext && (
         <>
-          <div className="click-away" onClick={() => setContext(null)} />
           <div
-            className="popover context-menu"
-            style={{
-              left: Math.min(context.x, window.innerWidth - 260),
-              top: Math.min(context.y, window.innerHeight - 390),
+            ref={rootContextAnchor}
+            aria-hidden="true"
+            className="sidebar-menu-point"
+            style={{ left: rootContext.x, top: rootContext.y }}
+          />
+          <SidebarMenu
+            anchor={rootContextAnchor}
+            label={t('New page options')}
+            onClose={() => setRootContext(null)}
+          >
+            {creationItems()}
+          </SidebarMenu>
+        </>
+      )}
+      {context && (
+        <SidebarMenu
+          anchor={contextAnchor}
+          side="right"
+          label={t('Page actions')}
+          onClose={() => setContext(null)}
+        >
+          <div className="popover-title">{context.page.title || t('Untitled')}</div>
+          {creationItems(context.page)}
+          <div className="menu-separator" />
+          <MenuItem
+            role="menuitem"
+            icon={<ArrowRight size={15} />}
+            onClick={() => {
+              navigate(context.page.id, true)
+              setContext(null)
             }}
           >
-            <div className="popover-title">{context.page.title || t('Untitled')}</div>
-            <MenuItem
-              icon={<FilePlus2 size={15} />}
-              onClick={() => {
-                create(context.page)
-                setContext(null)
-              }}
-            >
-              {context.page.kind === 'database' ? t('New entry') : t('New subpage')}
-            </MenuItem>
-            <MenuItem
-              icon={<ArrowRight size={15} />}
-              onClick={() => {
-                navigate(context.page.id, true)
-                setContext(null)
-              }}
-            >
-              {t('Open in new tab')}
-            </MenuItem>
-            <MenuItem
-              icon={<Pencil size={15} />}
-              onClick={() => {
-                setRename(context.page)
-                setTitle(context.page.title)
-                setContext(null)
-              }}
-            >
-              {t('Rename')}
-            </MenuItem>
-            <MenuItem
-              icon={<Copy size={15} />}
-              onClick={() => {
-                duplicate(context.page.id)
-                onNavigate('page')
-                setContext(null)
-              }}
-            >
-              {t('Duplicate')}
-            </MenuItem>
-            {!context.page.databaseId && (
+            {t('Open in new tab')}
+          </MenuItem>
+          <MenuItem
+            role="menuitem"
+            icon={<Pencil size={15} />}
+            onClick={() => {
+              setRename(context.page)
+              setTitle(context.page.title)
+              setContext(null)
+            }}
+          >
+            {t('Rename')}
+          </MenuItem>
+          <MenuItem
+            role="menuitem"
+            icon={<Copy size={15} />}
+            onClick={() => {
+              duplicate(context.page.id)
+              onNavigate('page')
+              setContext(null)
+            }}
+          >
+            {t('Duplicate')}
+          </MenuItem>
+          {documentTemplatesAvailable &&
+            w.plugins.documentTemplates.enabled &&
+            context.page.kind === 'page' && (
               <MenuItem
-                icon={<Layers size={15} />}
+                role="menuitem"
+                icon={<FilePlus2 size={15} />}
                 onClick={() => {
-                  setMove(context.page)
+                  onSaveAsTemplate(context.page.id)
                   setContext(null)
                 }}
               >
-                {t('Move to…')}
+                {t('Save as template')}
               </MenuItem>
             )}
+          {!context.page.databaseId && (
             <MenuItem
-              icon={<Link size={15} />}
+              role="menuitem"
+              icon={<Layers size={15} />}
               onClick={() => {
-                run(async () => {
-                  await window.sheco.copyText('sheco://page/' + context.page.id)
-                  notify(t('Page link copied.'))
-                })
+                setMove(context.page)
                 setContext(null)
               }}
             >
-              {t('Copy link')}
+              {t('Move to…')}
             </MenuItem>
-            <MenuItem
-              icon={<Download size={15} />}
-              onClick={() => {
-                const id = context.page.id
-                setContext(null)
-                run(async () => {
-                  await flush()
-                  const file = await window.sheco.exportPage(id, 'markdown')
-                  if (file) notify(t('Markdown exported.'))
-                })
-              }}
-            >
-              {t('Export Markdown…')}
-            </MenuItem>
-            <div className="menu-separator" />
-            <MenuItem
-              danger
-              icon={<Trash2 size={15} />}
-              onClick={() => {
-                removePage(context.page.id)
-                setContext(null)
-              }}
-            >
-              {t('Move to Trash')}
-            </MenuItem>
-          </div>
-        </>
+          )}
+          <div className="menu-separator" />
+          <MenuItem
+            role="menuitem"
+            icon={<Link size={15} />}
+            onClick={() => {
+              run(async () => {
+                await window.sheco.copyText('sheco://page/' + context.page.id)
+                notify(t('Page link copied.'))
+              })
+              setContext(null)
+            }}
+          >
+            {t('Copy link')}
+          </MenuItem>
+          <MenuItem
+            role="menuitem"
+            icon={<Download size={15} />}
+            onClick={() => {
+              const id = context.page.id
+              setContext(null)
+              run(async () => {
+                await flush()
+                const file = await window.sheco.exportPage(id, 'markdown')
+                if (file) notify(t('Markdown exported.'))
+              })
+            }}
+          >
+            {t('Export Markdown…')}
+          </MenuItem>
+          <div className="menu-separator" />
+          <MenuItem
+            role="menuitem"
+            danger
+            icon={<Trash2 size={15} />}
+            onClick={() => {
+              removePage(context.page.id)
+              setContext(null)
+            }}
+          >
+            {t('Move to Trash')}
+          </MenuItem>
+        </SidebarMenu>
       )}
       {newSpace && (
         <Modal title={t('Create a workspace')} onClose={() => setNewSpace(false)}>

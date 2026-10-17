@@ -9,8 +9,12 @@ import { FilledTableView } from './FilledTableView'
 import { AttachmentNode, Callout, CodeBlock, PageLink, WikiLink, DatabaseEmbed } from './extensions'
 import type { DocNode, Page } from '../shared/model'
 import { attachmentViews } from '../shared/media'
+import { ArchitectureEmbed } from './ArchitectureEmbed'
+import { architectureEmbedAttrsSchema } from '../shared/architectureDocument'
 import { MermaidBlock } from './DiagramBlock'
 import { diagramAttrsSchema } from '../shared/diagram'
+import { JiraBlock, JiraInline } from './JiraBlock'
+import { jiraIssueAttrsSchema } from '../shared/jira'
 
 // Used by both the editor and MCP validation so agents can author every editor block.
 export function documentExtensions(resolveTitle?: (title: string) => Page | undefined) {
@@ -37,6 +41,9 @@ export function documentExtensions(resolveTitle?: (title: string) => Page | unde
     Callout,
     CodeBlock,
     MermaidBlock,
+    ArchitectureEmbed,
+    JiraBlock,
+    JiraInline,
     PageLink,
     DatabaseEmbed,
     WikiLink.configure(resolveTitle ? { resolveTitle } : {}),
@@ -53,6 +60,15 @@ export function validateEditorDocument(doc: DocNode) {
     const spec = schema!.nodes[node.type]?.spec
     if (!spec) throw new Error('Unsupported block type: ' + node.type)
     const attrs = node.attrs ?? {}
+    if (
+      ['jiraIssue', 'jiraIssueInline'].includes(node.type) &&
+      !jiraIssueAttrsSchema.safeParse(attrs).success
+    )
+      throw new Error('Invalid Jira issue attributes')
+    if (node.type === 'jiraIssueInline' && attrs.display != null && attrs.display !== 'minimal')
+      throw new Error('Inline Jira issues use the minimal view')
+    if (node.type === 'architectureEmbed' && !architectureEmbedAttrsSchema.safeParse(attrs).success)
+      throw new Error('Invalid architecture preview reference')
     if (node.type === 'mermaid' && !diagramAttrsSchema.safeParse(attrs).success)
       throw new Error('Invalid Mermaid source or block positions')
     if (

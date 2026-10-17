@@ -21,8 +21,7 @@ below run from the repository root. Inspect `package.json` when changing the wor
 
 The renderer builds into `dist/`. Electron uses esbuild to produce CommonJS main/preload bundles
 in `dist-electron/`, targeting Node 22 with Electron external. Fix source files, then rebuild;
-editing generated output makes the next build discard the change. Main/preload changes in a dev
-session require rebuilding/restarting the app; the script is not a main-process watcher.
+editing generated output makes the next build discard the change. Main/preload changes and shared persisted-schema changes require rebuilding and restarting the entire app, including source previews; refreshing only the renderer can leave an old writer rejecting new fields. Flush and verify saved state before closing. If an older writer already rejects current edits, preserve a full recovery snapshot before any restart; never reload away the unsaved renderer. The script is not a main-process watcher.
 
 Platform icons (`build/icon.svg`, `.png`, `.ico`, `.icns`) are committed packaging inputs so a
 fresh checkout can package on either OS. `npm run icons` regenerates PNG/ICO and, on macOS using

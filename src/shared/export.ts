@@ -1,5 +1,7 @@
 import type { DocNode, Workspace, Page, Database } from './model'
 import { columnValue, databaseRows } from './model'
+import { architectureMermaid } from './projectArchitecture'
+import { jiraIssueAttrsSchema, jiraIssueUrl } from './jira'
 export function safeName(title: string): string {
   let value =
     title
@@ -74,6 +76,23 @@ export function markdown(
         Math.max(3, ...[...source.matchAll(/`+/g)].map((match) => match[0].length + 1)),
       )
       return `${fence}mermaid\n${source}\n${fence}\n\n`
+    }
+    case 'jiraIssueInline':
+    case 'jiraIssue': {
+      const attrs = jiraIssueAttrsSchema.safeParse(node.attrs ?? {}).data
+      if (!attrs?.issueKey) return node.type === 'jiraIssueInline' ? 'Jira' : 'Jira\n\n'
+      const link = `[${escapeText(attrs.issueKey)}](${jiraIssueUrl(attrs.baseUrl, attrs.issueKey).replace(/[()\s]/g, (c) => encodeURIComponent(c))})`
+      if (node.type === 'jiraIssueInline')
+        return link + (attrs.status ? ` (${escapeText(attrs.status)})` : '')
+      return (
+        link +
+        (attrs.display === 'detailed'
+          ? ` — ${escapeText(attrs.summary)}\n\nStatus: ${escapeText(attrs.status || '—')} · Due date: ${attrs.dueDate || '—'}`
+          : attrs.status
+            ? ` (${escapeText(attrs.status)})`
+            : '') +
+        '\n\n'
+      )
     }
     case 'bulletList':
     case 'orderedList':
@@ -181,7 +200,8 @@ export function markdown(
       return `[${escapeText(String(node.attrs?.name ?? 'Attachment'))}](${assetPrefix}${String(node.attrs?.file ?? '')})\n\n`
     case 'wikiLink':
     case 'pageLink':
-    case 'databaseEmbed': {
+    case 'databaseEmbed':
+    case 'architectureEmbed': {
       const id = String(node.attrs?.pageId ?? '')
       const label = escapeText(String(node.attrs?.label ?? 'Page'))
       return (
@@ -197,7 +217,29 @@ export function markdown(
       return children()
   }
 }
+function architectureDocument(page: Page): DocNode {
+  return {
+    type: 'doc',
+    content: page.architecture
+      ? [{ type: 'mermaid', attrs: { source: architectureMermaid(page.architecture) } }]
+      : [],
+  }
+}
 function expandDatabases(node: DocNode, w: Workspace): DocNode {
+  if (node.type === 'architectureEmbed') {
+    const page = w.pages.find(
+      (page) => page.id === node.attrs?.pageId && page.kind === 'architecture' && !page.deletedAt,
+    )
+    return page
+      ? {
+          type: 'doc',
+          content: [
+            { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: page.title }] },
+            ...(architectureDocument(page).content ?? []),
+          ],
+        }
+      : node
+  }
   if (node.type === 'databaseEmbed') {
     const page = w.pages.find((p) => p.id === node.attrs?.pageId && !p.deletedAt)
     const db = w.databases.find((d) => d.pageId === page?.id)
@@ -263,7 +305,11 @@ export function pageMarkdown(
     escapeText(page.title || 'Untitled') +
     '\n\n' +
     (page.description ? page.description + '\n\n' : '') +
-    markdown(expandDatabases(page.content, w), links, assetPrefix)
+    markdown(
+      page.kind === 'architecture' ? architectureDocument(page) : expandDatabases(page.content, w),
+      links,
+      assetPrefix,
+    )
   )
 }
 export function databaseCSV(db: Database, w: Workspace): string {

@@ -7,6 +7,7 @@ provides the same quick start in Russian. Detailed guides live here.
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------ |
 | Users                  | [Using Sheco](user-guide.md): editor, databases, files, MCP, exports, storage, and limits                          |
 | Plugin users           | [Plugins and portable JSON — Russian](plugins.md)                                                                  |
+| Plugin catalog         | [All built-in plugins with descriptions and screenshots — Russian / English](../plugins/README.md)                 |
 | Contributors           | [Contributing](../CONTRIBUTING.md), [development guides](development/README.md), [testing](development/testing.md) |
 | Architecture reviewers | [Data and process ownership](development/architecture.md), [security policy](../SECURITY.md)                       |
 | Maintainers            | [Release preparation](releasing.md), [CI results](https://github.com/shecof/Sheco/actions)                         |

@@ -21,13 +21,15 @@ on IPv4 loopback (`127.0.0.1`, default port 24876). It is disabled by default, a
 by default. It validates Host/Origin, uses a random 256-bit Bearer key with constant-time
 comparison, and bounds connections, bodies, and request duration.
 
+MCP is presented as a built-in plugin card, with Configure opening a reusable settings tab. The existing device-local configuration remains canonical; the plugin UI does not implicitly enable writes or follow the active workspace.
+
 Configuration is stored atomically in app-local `mcp.json`, outside workspace snapshots and
 exports. Keep tokens out of logs, test screenshots, documentation, and committed configuration.
 Use placeholder keys in examples. Tests may access fixture credentials privately in memory.
 
 ## Permissions and safe execution
 
-- Access is scoped to the workspace chosen in Settings while it is open in Sheco. Switching to
+- Access is scoped to the workspace chosen in Settings → Plugins → AI agents · MCP → Configure while it is open in Sheco. Switching to
   another workspace pauses access; never follow the active workspace implicitly.
 - Hide write tools in read-only mode, and enforce authorization at execution too. Recheck scope,
   permissions, and configuration generation for queued calls.
@@ -67,6 +69,16 @@ Creating an inline database produces a schema, backing page, and embed referenci
 Records are ordinary pages with database membership, properties, and any supported block content.
 Uploads return metadata and ready-to-insert block JSON. The internal attachment-registration
 operation is not an exposed client tool.
+
+## Architecture pages
+
+`create_page` accepts `kind=architecture` and optional bounded `architecture` data when the
+plugin is enabled; use a parentId for a child. `update_page` replaces architecture data with the
+same version guard as content edits; title changes synchronize the diagram name. Architecture
+pages reject hidden document-block edits and cannot be database entries. `architectureEmbed`
+references a live architecture page in the same workspace. The catalog uses an
+`ARCHITECTURE_PAGE_ID` placeholder: create/read a real page ID before insertion. `get_page`
+returns page-owned data, searchable object metadata and readable Mermaid Markdown.
 
 ## Adding or changing a tool
 

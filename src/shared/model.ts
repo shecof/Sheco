@@ -1,29 +1,24 @@
-import { z } from 'zod'
 import {
-  commandBuilderTab,
-  commandBuilderSettingsTab,
+  filePreviewTabSchema,
+  filePreviewId,
+  attachmentPreviewKind,
+  attachmentPreviewMime,
+} from './filePreview'
+import { z } from 'zod'
+import { architecturePageProjectSchema, architectureSearchText } from './architectureDocument'
+import { createArchitectureProject } from './projectArchitecture'
+import {
+  pluginAppTabs,
+  isPluginAppTab,
+  pluginAppEnabled,
+  pluginSettingsTabs,
+  isPluginSettingsTab,
   pluginsSchema,
   defaultPlugins,
 } from './plugins'
-
-export interface DocNode {
-  type: string
-  text?: string
-  attrs?: Record<string, unknown>
-  marks?: { type: string; attrs?: Record<string, unknown> }[]
-  content?: DocNode[]
-}
-export const nodeSchema: z.ZodType<DocNode> = z.lazy(() =>
-  z.object({
-    type: z.string().max(80),
-    text: z.string().optional(),
-    attrs: z.record(z.string(), z.unknown()).optional(),
-    marks: z
-      .array(z.object({ type: z.string(), attrs: z.record(z.string(), z.unknown()).optional() }))
-      .optional(),
-    content: z.array(nodeSchema).optional(),
-  }),
-)
+import { normalizeJiraDocument } from './jiraDocument'
+import { nodeSchema, type DocNode } from './document'
+export { nodeSchema, type DocNode } from './document'
 export const propertyTypes = [
   'text',
   'number',
@@ -55,21 +50,43 @@ export const valueSchema = z.union([
   z.null(),
 ])
 export type PropertyValue = z.infer<typeof valueSchema>
-export const pageSchema = z.object({
-  id: z.string().uuid(),
-  parentId: z.string().uuid().nullable(),
-  databaseId: z.string().uuid().nullable(),
-  title: z.string().max(500),
-  icon: z.string().max(40),
-  description: z.string().max(2000).default(''),
-  kind: z.enum(['page', 'database']),
-  order: z.number().finite(),
-  content: nodeSchema.refine((node) => node.type === 'doc', 'A page must contain a document root'),
-  properties: z.record(z.string(), valueSchema),
-  createdAt: z.string().datetime(),
-  updatedAt: z.string().datetime(),
-  deletedAt: z.string().datetime().nullable(),
-})
+export const pageSchema = z
+  .object({
+    id: z.string().uuid(),
+    parentId: z.string().uuid().nullable(),
+    databaseId: z.string().uuid().nullable(),
+    title: z.string().max(500),
+    icon: z.string().max(40),
+    description: z.string().max(2000).default(''),
+    kind: z.enum(['page', 'database', 'architecture']),
+    architecture: architecturePageProjectSchema.optional(),
+    order: z.number().finite(),
+    content: nodeSchema.refine(
+      (node) => node.type === 'doc',
+      'A page must contain a document root',
+    ),
+    properties: z.record(z.string(), valueSchema),
+    createdAt: z.string().datetime(),
+    updatedAt: z.string().datetime(),
+    deletedAt: z.string().datetime().nullable(),
+  })
+  .superRefine((page, ctx) => {
+    if (
+      (page.kind === 'architecture') !== !!page.architecture ||
+      (page.kind === 'architecture' && page.databaseId)
+    )
+      ctx.addIssue({
+        code: 'custom',
+        path: ['architecture'],
+        message: 'Architecture pages require their own diagram and cannot be database entries',
+      })
+  })
+  .transform((page) => {
+    const content = normalizeJiraDocument(page.content)
+    return content === page.content
+      ? page
+      : { ...page, content, updatedAt: nextTimestamp(page.updatedAt) }
+  })
 export type Page = z.infer<typeof pageSchema>
 export const databaseSchema = z.object({
   id: z.string().uuid(),
@@ -138,16 +155,18 @@ export const workspaceSchema = z
         .array(
           z.union([
             z.string().uuid(),
-            z.literal(commandBuilderTab),
-            z.literal(commandBuilderSettingsTab),
+            z.enum(pluginAppTabs),
+            z.enum(pluginSettingsTabs),
+            filePreviewTabSchema,
           ]),
         )
         .max(40),
       activeId: z
         .union([
           z.string().uuid(),
-          z.literal(commandBuilderTab),
-          z.literal(commandBuilderSettingsTab),
+          z.enum(pluginAppTabs),
+          z.enum(pluginSettingsTabs),
+          filePreviewTabSchema,
         ])
         .nullable(),
       expanded: z.array(z.string().uuid()),
@@ -162,6 +181,33 @@ export const workspaceSchema = z
     createdAt: z.string().datetime(),
     updatedAt: z.string().datetime(),
   })
+  .transform((w) => {
+    // Retire only valid image-preview tabs from the previous format; retain files and strict invalid-state checks.
+    if (
+      !w.plugins.filePreview.enabled ||
+      new Set(w.ui.tabs).size !== w.ui.tabs.length ||
+      (w.ui.activeId && !w.ui.tabs.includes(w.ui.activeId))
+    )
+      return w
+    const removed = new Set(
+      w.ui.tabs.filter((id) =>
+        w.attachments.some(
+          (a) => a.id === filePreviewId(id) && attachmentPreviewMime(a)?.startsWith('image/'),
+        ),
+      ),
+    )
+    if (!removed.size) return w
+    const tabs = w.ui.tabs.filter((id) => !removed.has(id))
+    return {
+      ...w,
+      ui: {
+        ...w.ui,
+        tabs,
+        activeId:
+          w.ui.activeId && removed.has(w.ui.activeId) ? (tabs.at(-1) ?? null) : w.ui.activeId,
+      },
+    }
+  })
   .superRefine((w, ctx) => {
     const pages = new Map(w.pages.map((p) => [p.id, p]))
     const dbs = new Map(w.databases.map((d) => [d.id, d]))
@@ -175,11 +221,14 @@ export const workspaceSchema = z
     if (
       new Set(w.ui.tabs).size !== w.ui.tabs.length ||
       w.ui.tabs.some((id) =>
-        id === commandBuilderSettingsTab
+        isPluginSettingsTab(id)
           ? false
-          : id === commandBuilderTab
-            ? !w.plugins.commandBuilder.enabled
-            : !pages.has(id) || pages.get(id)?.deletedAt,
+          : isPluginAppTab(id)
+            ? !pluginAppEnabled(w.plugins, id)
+            : filePreviewId(id)
+              ? !w.plugins.filePreview.enabled ||
+                !w.attachments.some((a) => a.id === filePreviewId(id) && attachmentPreviewKind(a))
+              : !pages.has(id) || pages.get(id)?.deletedAt,
       ) ||
       (w.ui.activeId && !w.ui.tabs.includes(w.ui.activeId))
     )
@@ -248,7 +297,15 @@ export function createPage(
     parentId,
     databaseId,
     kind,
-    icon: kind === 'database' ? 'table' : 'file',
+    icon: kind === 'database' ? 'table' : kind === 'architecture' ? 'network' : 'file',
+    ...(kind === 'architecture' && {
+      architecture: {
+        ...createArchitectureProject(title.trim().slice(0, 120) || 'Untitled architecture'),
+        ...(w.plugins.projectArchitecture.defaults && {
+          presentation: { ...w.plugins.projectArchitecture.defaults },
+        }),
+      },
+    }),
     description: '',
     order: Math.max(-1, ...w.pages.filter((p) => p.parentId === parentId).map((p) => p.order)) + 1,
     content: emptyDoc(),
@@ -278,11 +335,19 @@ export function plainText(node: DocNode): string {
       .join(' ')
   if (node.type === 'wikiLink' || node.type === 'pageLink') return String(node.attrs?.label ?? '')
   if (node.type === 'attachment') return String(node.attrs?.name ?? '')
+  if (node.type === 'architectureEmbed') return String(node.attrs?.label ?? '')
   if (node.type === 'mermaid') return String(node.attrs?.source ?? '')
+  if (node.type === 'jiraIssue' || node.type === 'jiraIssueInline')
+    return ['issueKey', 'summary', 'status', 'dueDate']
+      .map((key) => String(node.attrs?.[key] ?? ''))
+      .filter(Boolean)
+      .join(' ')
   return (node.content ?? [])
     .map(plainText)
     .join(node.type === 'paragraph' || node.type === 'heading' ? '' : ' ')
 }
+export const pageText = (page: Page) =>
+  page.architecture ? architectureSearchText(page.architecture) : plainText(page.content)
 export function ancestors(w: Workspace, id: string): Page[] {
   const out: Page[] = []
   const seen = new Set<string>()
@@ -343,7 +408,7 @@ export function movePage(
 }
 export function linkedIds(node: DocNode): string[] {
   const own =
-    ['wikiLink', 'pageLink', 'databaseEmbed'].includes(node.type) &&
+    ['wikiLink', 'pageLink', 'databaseEmbed', 'architectureEmbed'].includes(node.type) &&
     typeof node.attrs?.pageId === 'string'
       ? [node.attrs.pageId]
       : []
@@ -409,7 +474,7 @@ export function searchWorkspace(w: Workspace, query: string): SearchResult[] {
     )
     for (const file of matchingFiles)
       out.push({ page, kind: 'file', file, excerpt: page.title, score: 50 * words.length })
-    const content = plainText(page.content)
+    const content = pageText(page)
     const props = Object.values(page.properties).flat().join(' ')
     const all =
       `${title} ${page.description} ${content} ${props} ${[...files.values()].map((file) => file.name).join(' ')}`.toLocaleLowerCase()

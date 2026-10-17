@@ -1,10 +1,17 @@
 import { useEffect, useState } from 'react'
-import { Copy, RefreshCw, Plug, Check } from 'lucide-react'
+import { Copy, RefreshCw, Plug, Check, ArrowUpRight } from 'lucide-react'
 import { useI18n } from '../i18n'
+import { PluginSettingsHeader } from './PluginSettingsHeader'
 import { useApp } from '../state'
 import type { McpConfig, McpStatus } from '../shared/mcp'
 
-export function McpSettings() {
+export function McpSettings({
+  configuration = false,
+  onConfigure,
+}: {
+  configuration?: boolean
+  onConfigure?: () => void
+}) {
   const { t } = useI18n()
   const { w, data, notify, flush } = useApp()
   const [status, setStatus] = useState<McpStatus | null>(null)
@@ -28,12 +35,14 @@ export function McpSettings() {
     void refresh().then((next) => {
       if (alive && next) setPort(String(next.config.port))
     })
+    window.addEventListener('sheco-mcp-changed', refresh)
     const timer = setInterval(() => {
       void refresh()
     }, 5000)
     return () => {
       alive = false
       clearInterval(timer)
+      window.removeEventListener('sheco-mcp-changed', refresh)
     }
   }, [])
   async function configure(patch: Partial<McpConfig>) {
@@ -44,6 +53,7 @@ export function McpSettings() {
       await flush()
       const next = await window.sheco.configureMcp({ ...status.config, ...patch })
       setStatus(next)
+      window.dispatchEvent(new Event('sheco-mcp-changed'))
       setPort(String(next.config.port))
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
@@ -64,19 +74,17 @@ export function McpSettings() {
   const authorized = data?.spaces.find((space) => space.id === status?.config.workspaceId)
   const active = status?.config.workspaceId === w?.id
   return (
-    <section className="mcp-settings" aria-label={t('AI agents · MCP')}>
-      <h3>
-        <Plug size={12} /> {t('AI agents · MCP')}
-      </h3>
-      <div className="setting-row">
-        <div>
-          <strong>{t('Connect AI agents')}</strong>
-          <p>
-            {t(
-              'Give agents access to this workspace through a local MCP connection. Sheco must stay open.',
-            )}
-          </p>
-        </div>
+    <section
+      className={
+        'plugin-card mcp-settings ' + (configuration ? 'mcp-configuration' : 'mcp-plugin-card')
+      }
+      aria-label={t('AI agents · MCP')}
+    >
+      <PluginSettingsHeader
+        icon={Plug}
+        title={t('AI agents · MCP')}
+        description={t('Local MCP access for agents while Sheco is open.')}
+      >
         <button
           type="button"
           className={'setting-switch ' + (status?.config.enabled ? 'on' : '')}
@@ -93,8 +101,16 @@ export function McpSettings() {
         >
           <span />
         </button>
-      </div>
-      {status && (
+      </PluginSettingsHeader>
+      {!configuration && (
+        <div className="plugin-card-actions">
+          <button className="button" onClick={onConfigure}>
+            {t('Configure')}
+            <ArrowUpRight size={14} />
+          </button>
+        </div>
+      )}
+      {status && configuration && (
         <>
           <div className="setting-row">
             <div>

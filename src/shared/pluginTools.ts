@@ -435,7 +435,8 @@ const nmapAdditions = {
     toggle('append-output', 'Append to output files', '--append-output', { group: 'Output' }),
   ],
 }
-export const builtinTools = builtinToolsV1.map((tool) => ({
+// Frozen revision 2 is the comparison baseline for existing customized catalogs.
+export const builtinToolsV2 = builtinToolsV1.map((tool) => ({
   ...tool,
   outputPresets:
     tool.id === 'nmap'
@@ -524,4 +525,40 @@ export const builtinTools = builtinToolsV1.map((tool) => ({
       ]
     return [p]
   }),
+}))
+
+export const builtinTools = builtinToolsV2.map((tool) => ({
+  ...tool,
+  outputPresets:
+    tool.id === 'nmap'
+      ? [
+          ...tool.outputPresets,
+          {
+            id: 'nse-context',
+            label: 'NSE · results with hosts and ports',
+            shell: 'posix',
+            stages: [
+              [
+                'awk',
+                '/^Nmap scan report for/ || /^PORT[[:space:]]/ || /^[0-9]+\\/(tcp|udp)[[:space:]]/ || /^(Pre-scan|Post-scan|Host) script results:/ || /^\\|/',
+              ],
+            ],
+          },
+          {
+            id: 'nse-results',
+            label: 'NSE · results only',
+            shell: 'posix',
+            stages: [['awk', '/^(Pre-scan|Post-scan|Host) script results:/ || /^\\|/']],
+          },
+          {
+            id: 'nse-names',
+            label: 'NSE · scripts with results',
+            shell: 'posix',
+            stages: [
+              ['sed', '-n', '-E', 's/^\\|[_ ]?([[:alnum:]_-]+):.*/\\1/p'],
+              ['sort', '-u'],
+            ],
+          },
+        ]
+      : tool.outputPresets,
 }))

@@ -27,6 +27,7 @@ import {
 import { PopoverPicker } from './PopoverPicker'
 import { PluginActionsMenu, navigatePluginList } from './PluginControls'
 import { CommandOutputEditor } from './CommandOutputEditor'
+import { PluginSettingsHeader } from './PluginSettingsHeader'
 
 function SubcommandsInput({
   tool,
@@ -255,42 +256,45 @@ export function PluginConfiguration({ onOpen }: { onOpen: () => void }) {
   }
   return (
     <article className="plugin-configuration">
-      <header className="plugin-configuration-heading">
-        <div>
-          <h1>{t('Tool configuration')}</h1>
-          <p>{t('Choose a tool and edit its parameters.')}</p>
-        </div>
-        <PluginActionsMenu
-          label={t('Catalog actions')}
-          actions={[
-            {
-              label: t('Import JSON'),
-              icon: <Upload size={15} />,
-              disabled: pending,
-              onClick: importJson,
-            },
-            {
-              label: t('Export JSON'),
-              icon: <Download size={15} />,
-              disabled: pending,
-              onClick: exportJson,
-            },
-            {
-              label: t(mode === 'json' ? 'Back to tools' : 'Edit JSON'),
-              icon: <FileJson size={15} />,
-              onClick: () => switchMode(mode === 'json' ? 'tools' : 'json'),
-            },
-            ...(plugin.enabled
-              ? [
-                  {
-                    label: t('Open command builder'),
-                    icon: <Terminal size={15} />,
-                    onClick: onOpen,
-                  },
-                ]
-              : []),
-          ]}
-        />
+      <h1 className="plugin-settings-title">{t('Tool configuration')}</h1>
+      <header className="plugin-configuration-heading plugin-card">
+        <PluginSettingsHeader
+          icon={Terminal}
+          title={t('Command builder')}
+          description={t('Choose a tool and edit its parameters.')}
+        >
+          <PluginActionsMenu
+            label={t('Catalog actions')}
+            actions={[
+              {
+                label: t('Import JSON'),
+                icon: <Upload size={15} />,
+                disabled: pending,
+                onClick: importJson,
+              },
+              {
+                label: t('Export JSON'),
+                icon: <Download size={15} />,
+                disabled: pending,
+                onClick: exportJson,
+              },
+              {
+                label: t(mode === 'json' ? 'Back to tools' : 'Edit JSON'),
+                icon: <FileJson size={15} />,
+                onClick: () => switchMode(mode === 'json' ? 'tools' : 'json'),
+              },
+              ...(plugin.enabled
+                ? [
+                    {
+                      label: t('Open command builder'),
+                      icon: <Terminal size={15} />,
+                      onClick: onOpen,
+                    },
+                  ]
+                : []),
+            ]}
+          />
+        </PluginSettingsHeader>
       </header>
       {mode === 'json' ? (
         <section className="plugin-json-workspace" aria-label={t('Plugin JSON')}>

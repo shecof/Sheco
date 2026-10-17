@@ -15,7 +15,6 @@ import { NodeViewWrapper, ReactNodeViewRenderer, type NodeViewProps } from '@tip
 import {
   Crop,
   Expand,
-  RotateCcw,
   ImageOff,
   MessageSquare,
   ChevronLeft,
@@ -300,17 +299,6 @@ function ImageView({
               <Expand size={14} />
               {t('Full width')}
             </button>
-            {hasCrop && (
-              <button
-                type="button"
-                onClick={() =>
-                  changeImage({ src: original, originalSrc: null, crop: null, height: null })
-                }
-              >
-                <RotateCcw size={14} />
-                {t('Reset crop')}
-              </button>
-            )}
           </div>
           {['left', 'right'].map((side) => (
             <button
@@ -374,6 +362,14 @@ function ImageView({
         <ImageCropDialog
           src={original}
           initialCrop={hasCrop ? attrs.crop : null}
+          onReset={
+            hasCrop
+              ? () => {
+                  changeImage({ src: original, originalSrc: null, crop: null, height: null })
+                  setCropping(false)
+                }
+              : undefined
+          }
           onApply={applyCrop}
           onClose={() => setCropping(false)}
         />

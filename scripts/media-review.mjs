@@ -104,6 +104,37 @@ try {
   await expect(gallery.getByLabel('Image caption')).not.toBeFocused()
   await expect(gallery.getByLabel('Image caption')).toHaveValue('Second slide')
   await gallery.getByRole('button', { name: 'Full width', exact: true }).click()
+  const galleryImages = () =>
+    page
+      .locator('.document-editor')
+      .evaluate(
+        (element) =>
+          element.editor.getJSON().content.find((node) => node.type === 'imageGallery').attrs
+            .images,
+      )
+  const originalSlides = await galleryImages()
+  await gallery.getByRole('button', { name: 'Crop', exact: true }).click()
+  await page.getByLabel('Crop dimensions').filter({ hasText: '600' }).waitFor()
+  await page
+    .getByRole('button', { name: 'Resize crop bottom right', exact: true })
+    .press('Shift+ArrowLeft')
+  await page.getByRole('button', { name: 'Apply crop', exact: true }).click()
+  await expect(page.getByRole('dialog', { name: 'Crop image' })).toHaveCount(0)
+  const croppedSlides = await galleryImages()
+  expect(croppedSlides[0]).toEqual(originalSlides[0])
+  expect(croppedSlides[1].originalSrc).toBe(originalSlides[1].src)
+  expect(croppedSlides[1].src).not.toBe(originalSlides[1].src)
+  await gallery.getByRole('button', { name: 'Crop', exact: true }).click()
+  await page
+    .getByRole('dialog', { name: 'Crop image' })
+    .getByRole('button', { name: 'Reset crop', exact: true })
+    .click()
+  const restoredSlides = await galleryImages()
+  expect(restoredSlides[0]).toEqual(originalSlides[0])
+  expect(restoredSlides[1].src).toBe(originalSlides[1].src)
+  expect(restoredSlides[1].caption).toBe('Second slide')
+  await page.keyboard.press(process.platform === 'darwin' ? 'Meta+z' : 'Control+z')
+  expect(await galleryImages()).toEqual(croppedSlides)
   // Attachment command keeps even image files as attachments; nothing replaces earlier nodes.
   await choose([...notes, files[0]])
   await slash('attachment')

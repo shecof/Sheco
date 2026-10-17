@@ -1,3 +1,10 @@
+import { JiraPluginSettings } from './components/JiraPluginSettings'
+import { McpSettings } from './components/McpSettings'
+import { FilePreviewSettings } from './components/FilePreviewSettings'
+import { FilePreview } from './components/FilePreview'
+import type { PdfPreviewSession } from './shared/pdfPreview'
+import type { TemplateEditRequest } from './components/DocumentTemplates'
+import { filePreviewId } from './shared/filePreview'
 import { useI18n } from './i18n'
 import {
   lazy,
@@ -27,12 +34,16 @@ import {
   Table2,
   Search,
   ArrowUpRight,
-  Sparkles,
   HardDrive,
   ChevronDown,
   Folder,
-  BookOpen,
   Terminal,
+  File,
+  Ticket,
+  Plug,
+  PanelsTopLeft,
+  Braces,
+  Network,
 } from 'lucide-react'
 import { useApp } from './state'
 import { ancestors, plainText, linkedIds, type Page } from './shared/model'
@@ -43,12 +54,66 @@ import { QuickSearch } from './components/Search'
 import { SettingsDialog } from './components/Settings'
 import { ReadingSettings } from './components/ReadingSettings'
 import { CommandBuilder } from './components/CommandBuilder'
-import { commandBuilderTab, commandBuilderSettingsTab } from './shared/plugins'
+import {
+  commandBuilderTab,
+  commandBuilderSettingsTab,
+  jiraSettingsTab,
+  mcpSettingsTab,
+  filePreviewSettingsTab,
+  isPluginSettingsTab,
+  pluginSettingsTitle,
+  documentTemplatesTab,
+  documentTemplatesAvailable,
+  isPluginTabVisible,
+  documentTemplatesSettingsTab,
+  dataToolsTab,
+  dataToolsSettingsTab,
+  projectArchitectureTab,
+  projectArchitectureSettingsTab,
+  isPluginAppTab,
+  pluginAppEnabled,
+  pluginAppTitle,
+} from './shared/plugins'
+import {
+  captureTemplate,
+  documentTemplatesPluginSchema,
+  templateLimit,
+} from './shared/documentTemplates'
+import { validateReferences } from './shared/mcp'
+import { uid } from './shared/model'
+import { ArchitectureSettings } from './components/ArchitectureSettings'
 import { PluginConfiguration } from './components/PluginConfiguration'
 import { DatabaseView, PropertyField, ColumnPopover } from './components/Database'
 const BlockEditor = lazy(() =>
   import('./editor/BlockEditor').then((module) => ({ default: module.BlockEditor })),
 )
+const DocumentTemplates = lazy(() =>
+  import('./components/DocumentTemplates').then((module) => ({
+    default: module.DocumentTemplates,
+  })),
+)
+const TemplateConfiguration = lazy(() =>
+  import('./components/DocumentTemplates').then((module) => ({
+    default: module.TemplateConfiguration,
+  })),
+)
+const CreateTemplatePageDialog = lazy(() =>
+  import('./components/DocumentTemplates').then((module) => ({
+    default: module.CreateTemplatePageDialog,
+  })),
+)
+const DataTools = lazy(() =>
+  import('./components/DataTools').then((module) => ({ default: module.DataTools })),
+)
+const DataToolsSettings = lazy(() =>
+  import('./components/DataTools').then((module) => ({ default: module.DataToolsSettings })),
+)
+const ArchitecturePage = lazy(() =>
+  import('./components/ProjectArchitecture').then((module) => ({
+    default: module.ArchitecturePage,
+  })),
+)
+
 function DocumentEditor({ page }: { page: Page }) {
   const { t, language } = useI18n()
 
@@ -61,6 +126,16 @@ function DocumentEditor({ page }: { page: Page }) {
 import { PageIcon, IconButton, Popover, MenuItem } from './components/ui'
 
 function PageView({ page }: { page: Page }) {
+  const { t } = useI18n()
+  return page.kind === 'architecture' ? (
+    <Suspense fallback={<div className="editor-loading">{t('Opening editor…')}</div>}>
+      <ArchitecturePage page={page} />
+    </Suspense>
+  ) : (
+    <NotePageView page={page} />
+  )
+}
+function NotePageView({ page }: { page: Page }) {
   const { t, language } = useI18n()
 
   const { w, editPage, openPage, update, titleFocusId, clearTitleFocus } = useApp()
@@ -296,12 +371,31 @@ export function App() {
     notify,
     run,
     importPage,
+    canNavigate,
   } = useApp()
-  const [screen, setScreen] = useState('page')
+  useEffect(() => {
+    if (!w?.ui.activeId || isPluginTabVisible(w.ui.activeId)) return
+    const fallback =
+      [...w.ui.tabs].reverse().find(isPluginTabVisible) ??
+      w.pages.find((page) => !page.deletedAt)?.id
+    if (fallback) openPage(fallback, true)
+  }, [w?.id, w?.ui.activeId, w?.ui.tabs, openPage])
+  const [screen, setScreenValue] = useState('page')
+  const setScreen = (next: string) => {
+    if (next === 'page' || canNavigate()) setScreenValue(next)
+  }
   const [sidebar, setSidebar] = useState(true)
   const [search, setSearch] = useState<'current' | 'new' | null>(null)
   const [settings, setSettings] = useState(false)
   const [settingsCategory, setSettingsCategory] = useState<'plugins' | undefined>()
+  const [templatePage, setTemplatePage] = useState<{
+    workspaceId: string
+    templateId?: string
+    parentId: string | null
+  } | null>(null)
+  const [templateEditorRequest, setTemplateEditorRequest] = useState<
+    (TemplateEditRequest & { workspaceId: string }) | undefined
+  >()
   const showSettings = (plugins = false) => {
     setSettingsCategory(plugins ? 'plugins' : undefined)
     setSettings(true)
@@ -310,23 +404,85 @@ export function App() {
   const pageOptionsAnchor = useRef<HTMLDivElement>(null)
   const [exportMenu, setExportMenu] = useState(false)
   const exportAnchor = useRef<HTMLButtonElement>(null)
+  const previewSessions = useRef(new Map<string, PdfPreviewSession>())
+  useEffect(() => {
+    for (const key of previewSessions.current.keys())
+      if (!w || !w.ui.tabs.includes(key.slice(w.id.length + 1)) || !key.startsWith(w.id + ':'))
+        previewSessions.current.delete(key)
+  }, [w?.id, w?.ui.tabs])
   const historySpace = useRef('')
   const history = useRef<string[]>([])
   const historyIndex = useRef(-1)
   const goingBack = useRef(false)
   const [historyVersion, setHistoryVersion] = useState(0)
   const page = w?.pages.find((p) => p.id === w.ui.activeId && !p.deletedAt)
-  const activePlugin = w?.ui.activeId === commandBuilderTab && screen === 'page'
+  const activeAttachment =
+    screen === 'page' && w?.ui.activeId
+      ? w.attachments.find((a) => a.id === filePreviewId(w.ui.activeId!))
+      : undefined
+  const activeApp =
+    screen === 'page' && w?.ui.activeId && isPluginAppTab(w.ui.activeId) ? w.ui.activeId : null
+  const activePlugin = activeApp !== null
+  const activeSettings =
+    screen === 'page' && w?.ui.activeId && isPluginSettingsTab(w.ui.activeId) ? w.ui.activeId : null
   const activeConfiguration = w?.ui.activeId === commandBuilderSettingsTab && screen === 'page'
-  const openPluginConfiguration = () => {
-    openPage(commandBuilderSettingsTab, true)
+  const openPluginConfiguration = (id = commandBuilderSettingsTab as string) => {
+    openPage(id, true)
     setScreen('page')
     setSettings(false)
   }
-  const openPlugin = () => {
-    openPage(commandBuilderTab, true)
+  const openPlugin = (id = commandBuilderTab as string) => {
+    openPage(id, true)
     setScreen('page')
     setSettings(false)
+  }
+  const createFromTemplate = (templateId?: string, parentId: string | null = null) => {
+    if (!documentTemplatesAvailable || !w?.plugins.documentTemplates.enabled || busy) return
+    setTemplatePage({ workspaceId: w.id, templateId, parentId })
+    setScreen('page')
+  }
+  const editTemplate = (templateId?: string, create = false) => {
+    if (!w || !documentTemplatesAvailable) return
+    setTemplateEditorRequest((prior) => ({
+      workspaceId: w.id,
+      sequence: (prior?.sequence ?? 0) + 1,
+      templateId,
+      create,
+    }))
+    openPluginConfiguration(documentTemplatesSettingsTab)
+  }
+  const saveAsTemplate = async (pageId: string) => {
+    if (!w?.plugins.documentTemplates.enabled) return
+    const workspaceId = w.id
+    try {
+      const { validateEditorDocument } = await import('./editor/documentSchema')
+      let capturedId: string | undefined
+      update((current) => {
+        if (current.id !== workspaceId || !current.plugins.documentTemplates.enabled) return current
+        const source = current.pages.find(
+          (item) => item.id === pageId && !item.deletedAt && item.kind === 'page',
+        )
+        if (!source || current.plugins.documentTemplates.templates.length >= templateLimit)
+          return current
+        validateEditorDocument(source.content)
+        validateReferences(current, source.content)
+        const template = captureTemplate(
+          { ...source, title: source.title.trim() || t('Untitled') },
+          uid(),
+        )
+        const config = documentTemplatesPluginSchema.parse({
+          ...current.plugins.documentTemplates,
+          initialized: true,
+          templates: [...current.plugins.documentTemplates.templates, template],
+        })
+        capturedId = template.id
+        return { ...current, plugins: { ...current.plugins, documentTemplates: config } }
+      })
+      if (capturedId) editTemplate(capturedId)
+      else notify(t('Template library is full or the page is no longer available.'))
+    } catch {
+      notify(t('Check the template name and document.'))
+    }
   }
   const exportPage = useCallback(
     (format: 'markdown' | 'pdf' | 'csv') =>
@@ -367,8 +523,7 @@ export function App() {
       if (action === 'closeTab' && w?.ui.activeId) closeTab(w.ui.activeId)
       if (action === 'import')
         run(async () => {
-          await importPage()
-          setScreen('page')
+          if (await importPage()) setScreen('page')
         })
       if (action === 'exportMarkdown') exportPage('markdown')
       if (action === 'exportPDF') exportPage('pdf')
@@ -457,9 +612,11 @@ export function App() {
     const id = history.current[index]
     if (
       id &&
+      isPluginTabVisible(id) &&
       (w?.pages.some((p) => p.id === id && !p.deletedAt) ||
-        id === commandBuilderSettingsTab ||
-        (id === commandBuilderTab && w?.plugins.commandBuilder.enabled))
+        isPluginSettingsTab(id) ||
+        (isPluginAppTab(id) && !!w && pluginAppEnabled(w.plugins, id)) ||
+        (w?.plugins.filePreview.enabled && w.attachments.some((a) => a.id === filePreviewId(id))))
     ) {
       historyIndex.current = index
       goingBack.current = true
@@ -502,6 +659,9 @@ export function App() {
             onSearch={() => setSearch('current')}
             onSettings={() => showSettings()}
             onPluginSettings={() => showSettings(true)}
+            onPluginConfigure={openPluginConfiguration}
+            onCreateFromTemplate={(parentId) => createFromTemplate(undefined, parentId)}
+            onSaveAsTemplate={(id) => void saveAsTemplate(id)}
             onCollapse={() => setSidebar(false)}
           />
         )}
@@ -530,12 +690,18 @@ export function App() {
             </div>
             <div className="tabs" role="tablist">
               {w.ui.tabs
+                .filter(isPluginTabVisible)
                 .map((id) =>
-                  id === commandBuilderTab
-                    ? { id, title: t('Command builder'), icon: 'plugin' }
-                    : id === commandBuilderSettingsTab
-                      ? { id, title: t('Tool configuration'), icon: 'plugin' }
-                      : w.pages.find((p) => p.id === id && !p.deletedAt),
+                  isPluginAppTab(id)
+                    ? { id, title: t(pluginAppTitle(id)), icon: 'plugin' }
+                    : isPluginSettingsTab(id)
+                      ? { id, title: t(pluginSettingsTitle(id)), icon: 'plugin' }
+                      : filePreviewId(id)
+                        ? (() => {
+                            const a = w.attachments.find((a) => a.id === filePreviewId(id))
+                            return a ? { id, title: a.name, icon: 'file-preview' } : undefined
+                          })()
+                        : w.pages.find((p) => p.id === id && !p.deletedAt),
                 )
                 .filter((p): p is NonNullable<typeof p> => !!p)
                 .map((p) => (
@@ -571,8 +737,23 @@ export function App() {
                         setScreen('page')
                       }}
                     >
-                      {p.id === commandBuilderTab || p.id === commandBuilderSettingsTab ? (
+                      {p.id === jiraSettingsTab ? (
+                        <Ticket size={14} />
+                      ) : p.id === mcpSettingsTab ? (
+                        <Plug size={14} />
+                      ) : p.id === filePreviewSettingsTab ? (
+                        <PanelsTopLeft size={14} />
+                      ) : p.id === documentTemplatesTab || p.id === documentTemplatesSettingsTab ? (
+                        <FilePlus2 size={14} />
+                      ) : p.id === dataToolsTab || p.id === dataToolsSettingsTab ? (
+                        <Braces size={14} />
+                      ) : p.id === projectArchitectureTab ||
+                        p.id === projectArchitectureSettingsTab ? (
+                        <Network size={13} />
+                      ) : isPluginAppTab(p.id) || isPluginSettingsTab(p.id) ? (
                         <Terminal size={14} />
+                      ) : filePreviewId(p.id) ? (
+                        <File size={14} />
                       ) : (
                         <PageIcon icon={p.icon} size={14} />
                       )}
@@ -599,10 +780,21 @@ export function App() {
                 <span className="breadcrumb-space">{w.name[0]}</span>
                 {w.name}
               </button>
-              {activePlugin || activeConfiguration ? (
+              {activePlugin || activeSettings ? (
                 <span>
                   <ChevronRight size={12} />
-                  <span>{t(activeConfiguration ? 'Tool configuration' : 'Command builder')}</span>
+                  <span>
+                    {t(
+                      activeSettings
+                        ? pluginSettingsTitle(activeSettings)
+                        : pluginAppTitle(activeApp!),
+                    )}
+                  </span>
+                </span>
+              ) : activeAttachment ? (
+                <span>
+                  <ChevronRight size={12} />
+                  <span>{activeAttachment.name}</span>
                 </span>
               ) : screen === 'page' ? (
                 path.map((p, i) => (
@@ -695,7 +887,7 @@ export function App() {
                         }}
                       >
                         <div className="popover-title">{t('Page actions')}</div>
-                        {page.kind !== 'database' && (
+                        {page.kind === 'page' && (
                           <MenuItem
                             icon={<Search size={15} />}
                             onClick={() => {
@@ -742,6 +934,19 @@ export function App() {
                         >
                           {t('Copy page link')}
                         </MenuItem>
+                        {documentTemplatesAvailable &&
+                          w.plugins.documentTemplates.enabled &&
+                          page.kind === 'page' && (
+                            <MenuItem
+                              icon={<FilePlus2 size={15} />}
+                              onClick={() => {
+                                setMore(false)
+                                void saveAsTemplate(page.id)
+                              }}
+                            >
+                              {t('Save as template')}
+                            </MenuItem>
+                          )}
                         <div className="menu-separator" />
                         <div className="page-reading-options">
                           <div className="popover-title">{t('Reading')}</div>
@@ -856,24 +1061,93 @@ export function App() {
           {w.ui.tabs.includes(commandBuilderTab) && (
             <div
               className="content-scroll command-scroll"
-              hidden={!activePlugin}
+              hidden={screen !== 'page' || w.ui.activeId !== commandBuilderTab}
               key={w.id + ':command-builder'}
             >
               <CommandBuilder onSettings={openPluginConfiguration} />
             </div>
           )}
+          {(
+            [
+              documentTemplatesTab,
+              dataToolsTab,
+              documentTemplatesSettingsTab,
+              dataToolsSettingsTab,
+              projectArchitectureTab,
+              projectArchitectureSettingsTab,
+            ] as const
+          )
+            .filter((id) => isPluginTabVisible(id) && w.ui.tabs.includes(id))
+            .map((id) => (
+              <div
+                className="content-scroll plugin-tool-scroll"
+                hidden={screen !== 'page' || w.ui.activeId !== id}
+                key={w.id + ':' + id}
+              >
+                <Suspense fallback={<div className="editor-loading">{t('Opening editor…')}</div>}>
+                  {id === documentTemplatesTab ? (
+                    <DocumentTemplates onCreatePage={createFromTemplate} onEdit={editTemplate} />
+                  ) : id === dataToolsTab ? (
+                    <DataTools onConfigure={openPluginConfiguration} />
+                  ) : id === documentTemplatesSettingsTab ? (
+                    <TemplateConfiguration
+                      onBack={() => openPlugin(documentTemplatesTab)}
+                      request={
+                        templateEditorRequest?.workspaceId === w.id
+                          ? templateEditorRequest
+                          : undefined
+                      }
+                    />
+                  ) : id === projectArchitectureSettingsTab ? (
+                    <ArchitectureSettings />
+                  ) : (
+                    <DataToolsSettings />
+                  )}
+                </Suspense>
+              </div>
+            ))}
           {w.ui.tabs.includes(commandBuilderSettingsTab) && (
             <div
               className="content-scroll plugin-configuration-scroll"
               hidden={!activeConfiguration}
               key={w.id + ':command-builder-settings'}
             >
-              <PluginConfiguration onOpen={openPlugin} />
+              <PluginConfiguration onOpen={() => openPlugin()} />
             </div>
+          )}
+          {([jiraSettingsTab, mcpSettingsTab, filePreviewSettingsTab] as const)
+            .filter((id) => isPluginTabVisible(id) && w.ui.tabs.includes(id))
+            .map((id) => (
+              <div
+                className="content-scroll plugin-settings-scroll"
+                hidden={activeSettings !== id}
+                key={w.id + ':' + id}
+              >
+                <section className="plugin-settings-page" aria-label={t(pluginSettingsTitle(id))}>
+                  <h1>{t(pluginSettingsTitle(id))}</h1>
+                  {id === jiraSettingsTab ? (
+                    <JiraPluginSettings configuration />
+                  ) : id === mcpSettingsTab ? (
+                    <McpSettings configuration />
+                  ) : (
+                    <FilePreviewSettings configuration />
+                  )}
+                </section>
+              </div>
+            ))}
+          {activeAttachment && (
+            <FilePreview
+              key={w.id + ':' + activeAttachment.id}
+              attachment={activeAttachment}
+              session={previewSessions.current.get(w.id + ':' + w.ui.activeId)}
+              onSession={(session) =>
+                previewSessions.current.set(w.id + ':' + w.ui.activeId, session)
+              }
+            />
           )}
           <div
             className="content-scroll"
-            hidden={activePlugin || activeConfiguration}
+            hidden={activePlugin || !!activeSettings || !!activeAttachment}
             key={w.id + ':' + screen + ':' + (page?.id ?? 'none')}
           >
             {screen === 'trash' ? (
@@ -883,8 +1157,7 @@ export function App() {
             ) : (
               <div className="empty-workspace">
                 <span className="empty-illustration">
-                  <BookOpen size={48} />
-                  <Sparkles size={20} />
+                  <Logo />
                 </span>
                 <h1>{t('A little space to think.')}</h1>
                 <p>{t('Open a page, search your notes, or start something new.')}</p>
@@ -931,6 +1204,22 @@ export function App() {
             onConfigurePlugin={openPluginConfiguration}
           />
         )}
+        {documentTemplatesAvailable &&
+          templatePage?.workspaceId === w.id &&
+          w.plugins.documentTemplates.enabled && (
+            <Suspense fallback={<div className="editor-loading">{t('Opening editor…')}</div>}>
+              <CreateTemplatePageDialog
+                key={w.id}
+                initialId={templatePage.templateId}
+                parentId={templatePage.parentId}
+                onClose={() => setTemplatePage(null)}
+                onManage={(create = false) => {
+                  setTemplatePage(null)
+                  editTemplate(undefined, create)
+                }}
+              />
+            </Suspense>
+          )}
       </div>
       {busy && (
         <div className="workspace-transition" role="status">

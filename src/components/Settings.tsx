@@ -12,26 +12,26 @@ import {
   Laptop,
   FileWarning,
   Settings2,
-  Plug,
   Info,
   Puzzle,
+  ArrowUpRight,
 } from 'lucide-react'
 import { useApp } from '../state'
 import { Modal } from './ui'
 import { Logo } from './Logo'
-import { McpSettings } from './McpSettings'
 import { ReadingSettings } from './ReadingSettings'
 import { PluginSettings } from './PluginSettings'
+import { AppUpdates } from './AppUpdates'
 
 const categories = [
   { id: 'general', label: 'General', icon: Settings2 },
   { id: 'workspace', label: 'Workspace', icon: FolderOpen },
   { id: 'data', label: 'Data & backups', icon: Archive },
-  { id: 'agents', label: 'AI agents · MCP', icon: Plug },
   { id: 'plugins', label: 'Plugins', icon: Puzzle },
   { id: 'about', label: 'About Sheco', icon: Info },
 ] as const
 type Category = (typeof categories)[number]['id']
+const projectUrl = 'https://github.com/shecof/Sheco'
 
 export function SettingsDialog({
   onClose,
@@ -41,8 +41,8 @@ export function SettingsDialog({
 }: {
   onClose: () => void
   initialCategory?: Category
-  onOpenPlugin: () => void
-  onConfigurePlugin: () => void
+  onOpenPlugin: (id?: string) => void
+  onConfigurePlugin: (id?: string) => void
 }) {
   const { t, language, setLanguage } = useI18n()
 
@@ -245,9 +245,6 @@ export function SettingsDialog({
               </div>
             </section>
           </div>
-          <div {...panel('agents')}>
-            <McpSettings />
-          </div>
           <div {...panel('plugins')}>
             <PluginSettings onOpen={onOpenPlugin} onConfigure={onConfigurePlugin} />
           </div>
@@ -355,11 +352,7 @@ export function SettingsDialog({
               <h3>{t('About Sheco')}</h3>
               <div className="privacy-note">
                 <LockKeyhole size={20} />
-                <p>
-                  {t(
-                    'No account. No telemetry. No automatic uploads. Sheco blocks network requests from the editor. Web links open in your browser only when you click them.',
-                  )}
-                </p>
+                <p>{t('No account. No telemetry. No automatic uploads.')}</p>
               </div>
               <p className="muted small">
                 {t(
@@ -367,11 +360,24 @@ export function SettingsDialog({
                 )}
               </p>
             </section>
+            <AppUpdates />
             <div className="settings-version">
               <Logo />
               <div>
                 <strong>Sheco</strong>
-                <span>{t('Version 1.0.0')}</span>
+                <a
+                  className="settings-project-link"
+                  href={projectUrl}
+                  title={projectUrl}
+                  aria-label={t('Project on GitHub')}
+                  onClick={(event) => {
+                    event.preventDefault()
+                    run(() => window.sheco.external(projectUrl))
+                  }}
+                >
+                  GitHub
+                  <ArrowUpRight size={12} aria-hidden="true" />
+                </a>
               </div>
               <span>
                 <HardDrive size={13} />

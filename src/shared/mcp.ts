@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { architecturePageProjectSchema } from './architectureDocument'
 import { defaultDiagramScale } from './diagram'
 import {
   nodeSchema,
@@ -11,6 +12,7 @@ import {
   descendants,
   emptyDoc,
   plainText,
+  pageText,
   searchWorkspace,
   uid,
   nextTimestamp as timestamp,
@@ -18,7 +20,7 @@ import {
   type DocNode,
   type Page,
 } from './model'
-import { markdown } from './export'
+import { markdown, pageMarkdown } from './export'
 
 export const mcpConfigSchema = z.object({
   enabled: z.boolean().default(false),
@@ -51,6 +53,45 @@ const text = (text: string) => ({ type: 'text', text })
 const paragraph = (value = 'Your text') => ({ type: 'paragraph', content: [text(value)] })
 /** Examples use the same JSON node names as the editor, including nested blocks. */
 export const blockCatalog = [
+  {
+    name: 'Inline Jira issue',
+    example: {
+      type: 'paragraph',
+      content: [
+        text('See '),
+        {
+          type: 'jiraIssueInline',
+          attrs: {
+            baseUrl: 'https://jira.example.com',
+            issueKey: 'PROJECT-123',
+            display: 'minimal',
+            summary: 'Example issue',
+            status: 'In progress',
+            statusCategory: 'indeterminate',
+            dueDate: '',
+            fetchedAt: '',
+          },
+        },
+        text(' for the current status.'),
+      ],
+    },
+  },
+  {
+    name: 'Jira issue',
+    example: {
+      type: 'jiraIssue',
+      attrs: {
+        baseUrl: 'https://jira.example.com',
+        issueKey: 'PROJECT-123',
+        display: 'detailed',
+        summary: 'Example issue',
+        status: 'In progress',
+        statusCategory: 'indeterminate',
+        dueDate: '2026-10-20',
+        fetchedAt: '2026-10-12T00:00:00.000Z',
+      },
+    },
+  },
   { name: 'Text', example: paragraph() },
   {
     name: 'Heading (levels 1–4)',
@@ -92,6 +133,13 @@ export const blockCatalog = [
     example: { type: 'callout', attrs: { emoji: '💡', color: 'gray' }, content: [paragraph()] },
   },
   { name: 'Divider', example: { type: 'horizontalRule' } },
+  {
+    name: 'Architecture preview (references an architecture subpage)',
+    example: {
+      type: 'architectureEmbed',
+      attrs: { pageId: 'ARCHITECTURE_PAGE_ID', label: 'Infrastructure' },
+    },
+  },
   {
     name: 'Mermaid diagram',
     example: {
@@ -213,6 +261,7 @@ const pagePatch = z
     parentId: z.string().uuid().nullable().optional(),
     properties: props.optional(),
     content: doc.optional(),
+    architecture: architecturePageProjectSchema.optional(),
   })
   .strict()
 export const mcpTools = [
@@ -268,15 +317,17 @@ export const mcpTools = [
     name: 'create_page',
     write: true,
     description:
-      'Create a root page, nested page, or database entry (provide databaseId and its pageId as parentId). Supports any block JSON.',
+      'Create an ordinary or architecture page (kind=architecture requires the plugin), nested page, or database entry (provide databaseId and its pageId as parentId). Supports any block JSON.',
     schema: z
       .object({
         ...scope,
         ...revision,
         title: z.string().max(500),
+        kind: z.enum(['page', 'architecture']).default('page'),
+        architecture: architecturePageProjectSchema.optional(),
         parentId: z.string().uuid().nullable().default(null),
         databaseId: z.string().uuid().nullable().default(null),
-        icon: z.string().max(40).default('file'),
+        icon: z.string().max(40).optional(),
         description: z.string().max(2000).default(''),
         content: doc.optional(),
         properties: props.optional(),
@@ -287,7 +338,7 @@ export const mcpTools = [
     name: 'update_page',
     write: true,
     description:
-      'Patch page metadata, parent, database values, or full document. Properties are merged by column ID; use null to clear a value. Requires the latest page updatedAt; conflict never overwrites newer edits.',
+      'Patch page metadata, parent, database values, full document, or bounded architecture data on an architecture page. Properties are merged by column ID; use null to clear a value. Requires the latest page updatedAt; conflict never overwrites newer edits.',
     schema: z.object({ ...pageTarget, ...revision, ...pageVersion, patch: pagePatch }).strict(),
   },
   {
@@ -532,7 +583,7 @@ export function executeWorkspaceTool(
         blocks: blockCatalog,
         marks: ['bold', 'italic', 'strike', 'code', 'underline', 'link'],
         notes:
-          'Documents have {type:"doc",content:[blocks]}. Rich text uses text.marks. Link attrs.href supports http, https or mailto. Images use local asset URLs returned by upload_attachment. Attachment attrs.display is card (default), compact, tile or link. All writes use the editor schema. Read get_page.updatedAt before editing; never invent page, database, property or attachment IDs.',
+          'Documents have {type:"doc",content:[blocks]}. Rich text uses text.marks. Link attrs.href supports http, https or mailto. Images use local asset URLs returned by upload_attachment. Attachment attrs.display is card (default), compact, tile or link. Use jiraIssue for detailed Jira cards and jiraIssueInline inside paragraph or heading content for minimal key/status mentions. Both use snapshot attributes, never a PAT; inline display is minimal. Legacy minimal block snapshots remain readable. Jira network requests require explicit editor actions and configured credentials; MCP cannot read credentials or fetch Jira. All writes use the editor schema. Read get_page.updatedAt before editing; never invent page, database, property or attachment IDs.',
       }
       break
     case 'list_pages': {
@@ -545,9 +596,14 @@ export function executeWorkspaceTool(
         .sort((p, q) => p.order - q.order)
       result = {
         total: pages.length,
-        pages: pages
-          .slice(a.offset, a.offset + a.limit)
-          .map(({ content, ...p }) => ({ ...p, blockCount: content.content?.length ?? 0 })),
+        pages: pages.slice(a.offset, a.offset + a.limit).map(({ content, architecture, ...p }) => ({
+          ...p,
+          blockCount: content.content?.length ?? 0,
+          ...(architecture && {
+            architectureObjectCount: architecture.objects.length,
+            architectureSiteCount: architecture.sites.length,
+          }),
+        })),
       }
       break
     }
@@ -565,9 +621,20 @@ export function executeWorkspaceTool(
       }
       break
     case 'get_page':
-      result = { page, markdown: markdown(page!.content), text: plainText(page!.content) }
+      result = {
+        page,
+        markdown: page!.kind === 'architecture' ? pageMarkdown(page!, w) : markdown(page!.content),
+        text: pageText(page!),
+      }
       break
     case 'create_page': {
+      if (
+        a.kind === 'architecture' &&
+        (!w.plugins.projectArchitecture.enabled || a.databaseId || a.content)
+      )
+        throw new Error('Enable architecture and create it as an independent diagram page')
+      if (a.kind !== 'architecture' && a.architecture)
+        throw new Error('Architecture data requires an architecture page')
       if (a.parentId) requirePage(w, a.parentId)
       if (
         a.databaseId &&
@@ -575,8 +642,14 @@ export function executeWorkspaceTool(
       )
         throw new Error('Database and parent do not match')
       const p = {
-        ...createPage(w, a.title, a.parentId, 'page', a.databaseId),
-        icon: a.icon,
+        ...createPage(w, a.title, a.parentId, a.kind, a.databaseId),
+        ...(a.architecture && {
+          architecture: {
+            ...a.architecture,
+            name: a.title.trim().slice(0, 120) || 'Untitled architecture',
+          },
+        }),
+        icon: a.icon ?? (a.kind === 'architecture' ? 'network' : 'file'),
         description: a.description,
         content: a.content ? content(a.content) : emptyDoc(),
         properties: a.properties ?? {},
@@ -587,10 +660,23 @@ export function executeWorkspaceTool(
       break
     }
     case 'update_page': {
+      if (
+        a.patch.architecture &&
+        (page!.kind !== 'architecture' || !w.plugins.projectArchitecture.enabled)
+      )
+        throw new Error('Choose an enabled architecture page')
+      if (page!.kind === 'architecture' && a.patch.content)
+        throw new Error('Edit architecture data instead of hidden document blocks')
       if (a.patch.parentId) requirePage(w, a.patch.parentId)
       const p = {
         ...page!,
         ...a.patch,
+        ...(page!.architecture && {
+          architecture: {
+            ...(a.patch.architecture ?? page!.architecture),
+            name: (a.patch.title ?? page!.title).trim().slice(0, 120) || 'Untitled architecture',
+          },
+        }),
         properties: a.patch.properties
           ? { ...page!.properties, ...a.patch.properties }
           : page!.properties,
@@ -602,6 +688,8 @@ export function executeWorkspaceTool(
       break
     }
     case 'edit_blocks': {
+      if (page!.kind === 'architecture')
+        throw new Error('Choose an ordinary page for document blocks')
       const blocks = [...(page!.content.content ?? [])]
       if (a.index > blocks.length || a.deleteCount > blocks.length - a.index)
         throw new Error('Block range out of bounds')
@@ -617,6 +705,8 @@ export function executeWorkspaceTool(
       break
     }
     case 'move_blocks': {
+      if (page!.kind === 'architecture')
+        throw new Error('Choose an ordinary page for document blocks')
       const blocks = [...(page!.content.content ?? [])]
       if (a.index + a.count > blocks.length || a.toIndex > blocks.length - a.count)
         throw new Error('Block range out of bounds')
@@ -676,7 +766,7 @@ export function executeWorkspaceTool(
       break
     }
     case 'create_database': {
-      if (page!.kind === 'database') throw new Error('Choose an ordinary page as the host')
+      if (page!.kind !== 'page') throw new Error('Choose an ordinary page as the host')
       const p = createPage(w, a.title, page!.id, 'database')
       const database = createDatabase(p.id)
       if (a.columns) database.columns = a.columns.map((c: any) => ({ ...c, id: c.id ?? uid() }))
@@ -759,8 +849,10 @@ export function executeWorkspaceTool(
 /** Prevent agent-authored links from escaping registered pages and local assets. */
 export function validateReferences(w: Workspace, node: DocNode) {
   const attrs = node.attrs ?? {}
-  if (['pageLink', 'wikiLink', 'databaseEmbed'].includes(node.type)) {
+  if (['pageLink', 'wikiLink', 'databaseEmbed', 'architectureEmbed'].includes(node.type)) {
     const page = requirePage(w, String(attrs.pageId))
+    if (node.type === 'architectureEmbed' && page.kind !== 'architecture')
+      throw new Error('Architecture preview must reference an architecture page')
     if (node.type === 'databaseEmbed' && page.kind !== 'database')
       throw new Error('Database embed must reference a database page')
   }

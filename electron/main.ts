@@ -1,3 +1,11 @@
+import {
+  attachmentPreviewMime,
+  attachmentPreviewKind,
+  previewRequestSchema,
+  pdfPreviewLimit,
+  textPreviewLimit,
+  decodePreviewText,
+} from '../src/shared/filePreview'
 import { translate, type Language } from '../src/shared/i18n'
 import {
   app,
@@ -10,16 +18,22 @@ import {
   shell,
   net,
   clipboard,
+  safeStorage,
 } from 'electron'
 import fs from 'node:fs/promises'
+import { createReadStream } from 'node:fs'
 import path from 'node:path'
+import { assetResponse } from './assetResponse'
 import { z } from 'zod'
 import { WorkspaceStore, atomicWrite, validateWorkspace } from './storage'
 import { McpService } from './mcp'
+import { JiraCredentials, fetchJiraIssue } from './jira'
+import { jiraSelectionSchema, jiraCredentialsSchema, jiraRequestSchema } from '../src/shared/jira'
 import type { McpReply } from '../src/shared/mcp'
 import { randomUUID } from 'node:crypto'
 import { seedWorkspace } from '../src/shared/seed'
 import { commandBuilderConfigSchema, parsePluginJson, pluginJsonLimit } from '../src/shared/plugins'
+import { AppUpdateService } from './updates'
 import { safeName, pageFilename, pageMarkdown, databaseCSV } from '../src/shared/export'
 import {
   ancestors,
@@ -51,6 +65,8 @@ let win: BrowserWindow
 let allowClose = false
 let quitting = false
 let mcp: McpService
+let jira: JiraCredentials
+let updates: AppUpdateService
 const mcpReplies = new Map<
   string,
   { resolve: (value: Record<string, unknown>) => void; reject: (error: Error) => void }
@@ -229,6 +245,88 @@ async function activate(next: WorkspaceStore): Promise<BootData> {
   return bootData()
 }
 function installIPC() {
+  const updateSession = session.fromPartition('update-requests')
+  updates = new AppUpdateService(
+    app.getPath('userData'),
+    app.getVersion(),
+    (input, init) => updateSession.fetch(input instanceof URL ? input.href : input, init),
+    (state) => {
+      if (!win.isDestroyed() && !win.webContents.isDestroyed())
+        win.webContents.send('app-update-state', state)
+    },
+  )
+  handle('app-version', () => app.getVersion())
+  handle('app-update-check', (input: unknown) => {
+    z.undefined().parse(input)
+    return updates.check()
+  })
+  handle('app-update-state', async (input: unknown) => {
+    z.undefined().parse(input)
+    await updates.initialize()
+    return updates.snapshot()
+  })
+  handle('app-update-configure', (input: unknown) => {
+    return updates.configure(input)
+  })
+  jira = new JiraCredentials(app.getPath('userData'), safeStorage)
+  // Use the OS network stack in an ephemeral session, separate from the blocked renderer.
+  const jiraSession = session.fromPartition('jira-requests')
+  const jiraScope = (workspaceId: string) => {
+    if (store.state.id !== workspaceId) throw new Error(t('The Jira workspace is no longer open.'))
+    return store
+  }
+  handle('jira-status', (input: unknown) => {
+    const { workspaceId, baseUrl } = jiraSelectionSchema.parse(input)
+    const target = jiraScope(workspaceId)
+    const connection = baseUrl
+      ? target.state.plugins.jira.connections.find((item) => item.baseUrl === baseUrl)
+      : target.state.plugins.jira.connections[0]
+    return jira.status(workspaceId, connection?.baseUrl ?? '', connection?.authType ?? 'pat')
+  })
+  handle('jira-configure', async (input: unknown) => {
+    const { workspaceId, baseUrl, credentials } = jiraCredentialsSchema.parse(input)
+    const target = jiraScope(workspaceId)
+    if (
+      !target.state.plugins.jira.connections.some(
+        (item) => item.baseUrl === baseUrl && item.authType === credentials.type,
+      )
+    )
+      throw new Error(t('Save the Jira connection settings first.'))
+    await jira.save(workspaceId, baseUrl, credentials)
+  })
+  handle('jira-forget-token', (input: unknown) => {
+    const { workspaceId, baseUrl } = jiraSelectionSchema.parse(input)
+    const target = jiraScope(workspaceId)
+    const address = baseUrl ?? target.state.plugins.jira.connections[0]?.baseUrl
+    if (address) return jira.remove(workspaceId, address)
+  })
+  handle('jira-issue', async (input: unknown) => {
+    const { workspaceId, baseUrl, issueKey } = jiraRequestSchema.parse(input)
+    const target = jiraScope(workspaceId)
+    const connection = target.state.plugins.jira.connections.find(
+      (item) => item.baseUrl === baseUrl,
+    )
+    if (!connection) throw new Error(t('Enable Jira and use the configured server address.'))
+    const { authType } = connection
+    const allowed = () =>
+      target === store &&
+      target.state.plugins.jira.enabled &&
+      target.state.plugins.jira.connections.some(
+        (item) =>
+          item.id === connection.id && item.baseUrl === baseUrl && item.authType === authType,
+      )
+    if (!allowed()) throw new Error(t('Enable Jira and use the configured server address.'))
+    const credentials = await jira.credentials(workspaceId, baseUrl, authType)
+    if (!allowed()) throw new Error(t('The Jira configuration changed. Try again.'))
+    const issue = await fetchJiraIssue(baseUrl, issueKey, credentials, (input, init) => {
+      if (!allowed()) throw new Error('The Jira configuration changed. Try again.')
+      return jiraSession.fetch(input instanceof URL ? input.href : input, init)
+    }).catch((error: Error) => {
+      throw new Error(t(error.message))
+    })
+    if (!allowed()) throw new Error(t('The Jira configuration changed. Try again.'))
+    return issue
+  })
   handle('import-plugin-settings', async () => {
     const result = await dialog.showOpenDialog(win, {
       title: t('Import plugin JSON'),
@@ -372,6 +470,52 @@ function installIPC() {
     pendingAttachments.set(a.id, a)
     return a
   })
+  async function readPreviewBytes(input: unknown, kind: 'pdf' | 'text') {
+    const limit = kind === 'pdf' ? pdfPreviewLimit : textPreviewLimit
+    const { workspaceId, attachmentId } = previewRequestSchema.parse(input)
+    const target = store
+    if (target.state.id !== workspaceId || !target.state.plugins.filePreview.enabled)
+      throw new Error('File preview is disabled or the workspace changed.')
+    const attachment = target.state.attachments.find((a) => a.id === attachmentId)
+    if (!attachment || attachmentPreviewKind(attachment) !== kind)
+      throw new Error('Unsupported preview')
+    const file = await target.attachmentPath(attachment.file)
+    if ((await fs.stat(file)).size > limit)
+      throw new Error(
+        kind === 'pdf'
+          ? 'PDF previews support files up to 64 MB.'
+          : 'Text previews support files up to 4 MB.',
+      )
+    const chunks: Buffer[] = []
+    let length = 0
+    for await (const chunk of createReadStream(file)) {
+      length += chunk.length
+      if (length > limit)
+        throw new Error(
+          kind === 'pdf'
+            ? 'PDF previews support files up to 64 MB.'
+            : 'Text previews support files up to 4 MB.',
+        )
+      chunks.push(chunk)
+    }
+    const bytes = Buffer.concat(chunks, length)
+    if (
+      bytes.length > limit ||
+      store !== target ||
+      store.state.id !== workspaceId ||
+      !store.state.plugins.filePreview.enabled
+    )
+      throw new Error('File preview is disabled or the workspace changed.')
+    return bytes
+  }
+  handle('read-preview-pdf', async (input: unknown) => {
+    const bytes = await readPreviewBytes(input, 'pdf')
+    return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)
+  })
+  handle('read-preview-text', async (input: unknown) =>
+    decodePreviewText(await readPreviewBytes(input, 'text')),
+  )
+
   handle('open-attachment', async (id: string) => {
     z.string().uuid().parse(id)
     const a = store.state.attachments.find((a) => a.id === id) ?? pendingAttachments.get(id)
@@ -498,16 +642,24 @@ function installIPC() {
     return result.filePath
   })
   handle('import-markdown', async () => {
+    const targetStore = store
+    const workspaceId = targetStore.state.id
+    const checkScope = () => {
+      if (store !== targetStore || targetStore.state.id !== workspaceId)
+        throw new Error(t('Workspace changed while importing Markdown.'))
+    }
     const result = await dialog.showOpenDialog(win, {
       title: t('Import a Markdown page'),
       filters: [{ name: 'Markdown', extensions: ['md', 'markdown', 'txt'] }],
       properties: ['openFile'],
     })
     if (result.canceled) return null
+    checkScope()
     const file = result.filePaths[0]
     if ((await fs.stat(file)).size > 10 * 1024 * 1024)
       throw new Error('Markdown imports are limited to 10 MB.')
     let text = await fs.readFile(file, 'utf8')
+    checkScope()
     // Import only relative images within the selected document's folder; never fetch URLs.
     const directory = await fs.realpath(path.dirname(file))
     const matches = [...text.matchAll(/!\[([^\]]*)\]\(([^)]+)\)/g)]
@@ -520,7 +672,10 @@ function installIPC() {
         const target = await fs.realpath(path.resolve(directory, source))
         if (!target.startsWith(directory + path.sep)) continue
         if ((await fs.stat(target)).size > 200 * 1024 * 1024) continue
-        const a = await store.addAttachment(path.basename(target), await fs.readFile(target))
+        const bytes = await fs.readFile(target)
+        checkScope()
+        const a = await targetStore.addAttachment(path.basename(target), bytes)
+        checkScope()
         pendingAttachments.set(a.id, a)
         assets.push(a)
         text = text.replace(match[0], `![${match[1]}](sheco-asset://${store.state.id}/${a.file})`)
@@ -528,6 +683,7 @@ function installIPC() {
         /* Missing local images remain explicit Markdown text. */
       }
     }
+    checkScope()
     return { title: path.basename(file, path.extname(file)), text, attachments: assets }
   })
   handle('set-language', (value: string) => {
@@ -538,6 +694,7 @@ function installIPC() {
   handle('show-folder', () => shell.openPath(store.root))
   ipcMain.on('ready-close', async (event) => {
     if (event.sender !== win.webContents) return
+    await updates.flush()
     await mcp.stop()
     await store.close()
     allowClose = true
@@ -714,6 +871,8 @@ else {
           const types: Record<string, string> = {
             '.html': 'text/html',
             '.js': 'text/javascript',
+            '.mjs': 'text/javascript',
+            '.wasm': 'application/wasm',
             '.css': 'text/css',
             '.woff': 'font/woff',
             '.woff2': 'font/woff2',
@@ -740,16 +899,22 @@ else {
           const a =
             store.state.attachments.find((a) => a.file === file) ??
             [...pendingAttachments.values()].find((a) => a.file === file)
-          if (!a || !/^image\/(png|jpeg|gif|webp|avif)$/.test(a.mime))
+          const mime = a && attachmentPreviewMime(a)
+          if (
+            !a ||
+            !mime ||
+            (!mime.startsWith('image/') &&
+              !(mime.startsWith('video/') && store.state.plugins.filePreview.enabled))
+          )
             throw new Error('Unsupported preview')
-          return new Response(await fs.readFile(await store.attachmentPath(file)), {
-            headers: {
-              'Content-Type': a.mime,
-              'Access-Control-Allow-Origin': devURL ?? 'sheco://app',
-              'Content-Security-Policy': "default-src 'none'",
-              'X-Content-Type-Options': 'nosniff',
-            },
-          })
+          const target = store
+          const localPath = await target.attachmentPath(file)
+          if (
+            store !== target ||
+            (!mime.startsWith('image/') && !target.state.plugins.filePreview.enabled)
+          )
+            throw new Error('Workspace changed')
+          return assetResponse(localPath, mime, devURL ?? 'sheco://app', request)
         } catch {
           return new Response('Not found', { status: 404 })
         }
@@ -762,6 +927,7 @@ else {
       )
       await mcp.initialize()
       await createWindow()
+      void updates.start()
     })
     .catch(async (error) => {
       await dialog.showMessageBox({

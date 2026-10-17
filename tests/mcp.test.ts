@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { seedWorkspace } from '../src/shared/seed'
 import { blockCatalog, executeWorkspaceTool } from '../src/shared/mcp'
 import { validateEditorDocument } from '../src/editor/documentSchema'
-import { uid, nextTimestamp, type DocNode } from '../src/shared/model'
+import { uid, nextTimestamp, createPage, type DocNode } from '../src/shared/model'
 
 function fixture() {
   const w = seedWorkspace()
@@ -78,6 +78,8 @@ describe('MCP workspace operations', () => {
   })
   it('validates examples for every block against the real editor schema and preserves attributes', () => {
     const { w, page, attachment } = fixture()
+    const architecture = createPage(w, 'Infrastructure', page.id, 'architecture')
+    w.pages.push(architecture)
     const examples = blockCatalog.map((b) =>
       JSON.parse(
         JSON.stringify(b.example)
@@ -85,6 +87,7 @@ describe('MCP workspace operations', () => {
             'sheco-asset://WORKSPACE_ID/ATTACHMENT_FILE',
             `sheco-asset://${w.id}/${attachment.file}`,
           )
+          .replaceAll('ARCHITECTURE_PAGE_ID', architecture.id)
           .replaceAll('DATABASE_PAGE_ID', w.databases[0].pageId)
           .replaceAll('PAGE_ID', w.pages[0].id)
           .replaceAll('ATTACHMENT_ID', attachment.id)

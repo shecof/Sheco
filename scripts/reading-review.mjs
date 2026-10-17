@@ -403,7 +403,7 @@ try {
   await page.getByRole('button', { name: 'Copy page link', exact: true }).click()
   expect(await app.evaluate(() => globalThis.shecoTestCopied)).toBe(`sheco://page/${note.id}`)
   await page.locator('.tree-page').filter({ hasText: note.title }).click({ button: 'right' })
-  await page.getByRole('button', { name: 'Copy link', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Copy link', exact: true }).click()
   expect(await app.evaluate(() => globalThis.shecoTestCopied)).toBe(`sheco://page/${note.id}`)
   const fixed = await page.locator('.document-main').boundingBox()
   await preferences()

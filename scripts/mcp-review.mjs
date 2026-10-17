@@ -35,6 +35,7 @@ async function connect() {
       requestInit: { headers: { Authorization: 'Bearer ' + connection.config.token } },
     }),
   )
+  expect(client.getServerVersion()?.version).toBe(await app.evaluate(({ app }) => app.getVersion()))
 }
 async function call(name, args = {}) {
   const response = await client.callTool({ name, arguments: args })
@@ -71,7 +72,6 @@ try {
     'General',
     'Workspace',
     'Data & backups',
-    'AI agents · MCP',
     'Plugins',
     'About Sheco',
   ])
@@ -98,21 +98,29 @@ try {
   await expect(settings.getByRole('button', { name: 'Close', exact: true })).toBeFocused()
   await page.keyboard.press('Shift+Tab')
   await expect(lastGeneralControl).toBeFocused()
-  await categories.getByRole('tab', { name: 'AI agents · MCP', exact: true }).click()
+  await categories.getByRole('tab', { name: 'Plugins', exact: true }).click()
   await expect(page.getByRole('switch', { name: 'Enable MCP' })).toHaveAttribute(
     'aria-checked',
     'false',
   )
+  await settings.getByRole('button', { name: 'Tools', exact: true }).click()
+  await settings.getByRole('switch', { name: 'Enable project architecture', exact: true }).click()
+  await settings.getByRole('button', { name: 'Integrations', exact: true }).click()
+  await page
+    .locator('.mcp-plugin-card')
+    .getByRole('button', { name: 'Configure', exact: true })
+    .click()
+  await expect(page.getByRole('dialog', { name: 'Settings', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: 'MCP settings', exact: true })).toBeVisible()
   await page.getByLabel('MCP port').fill(String(port))
-  await categories.getByRole('tab', { name: 'Data & backups', exact: true }).click()
-  await expect(settings.getByRole('button', { name: 'Export', exact: true })).toBeVisible()
+  await page.locator('.tabs .tab-open').first().click()
   await expect(page.getByLabel('MCP port')).toBeHidden()
-  await categories.getByRole('tab', { name: 'AI agents · MCP', exact: true }).click()
+  await page.locator('.tabs').getByRole('button', { name: 'MCP settings', exact: true }).click()
   await expect(page.getByLabel('MCP port')).toHaveValue(String(port))
   await page.getByRole('button', { name: 'Apply', exact: true }).click()
   await page.getByRole('switch', { name: 'Enable MCP' }).click()
   await expect(page.locator('.mcp-state')).toContainText('Ready for agents')
-  await page.locator('.mcp-settings').scrollIntoViewIfNeeded()
+  await page.locator('.mcp-configuration').scrollIntoViewIfNeeded()
   await page.screenshot({ path: path.join(output, 'settings-light.png') })
   // Keep clipboard verification inside this fixture; do not replace the user's clipboard.
   await app.evaluate(({ clipboard }) => {
@@ -219,10 +227,17 @@ try {
     base64: Buffer.from('Local attachment data').toString('base64'),
   })
   const dbs = (await call('list_databases', scope)).databases
+  const architecture = await call('create_page', {
+    ...scope,
+    title: 'Agent architecture',
+    parentId: id,
+    kind: 'architecture',
+  })
   const examples = (await call('get_block_catalog')).blocks.map((b) =>
     JSON.parse(
       JSON.stringify(b.example)
         .replaceAll('sheco-asset://WORKSPACE_ID/ATTACHMENT_FILE', uploaded.assetUrl)
+        .replaceAll('ARCHITECTURE_PAGE_ID', architecture.page.id)
         .replaceAll('DATABASE_PAGE_ID', dbs[0].pageId)
         .replaceAll('PAGE_ID', id)
         .replaceAll('ATTACHMENT_ID', file.attachment.id)
@@ -242,7 +257,9 @@ try {
   await expect(page.locator('.document-editor .code-block')).toHaveCount(1)
   await expect(page.locator('.document-editor .image-gallery')).toHaveCount(1)
   await expect(page.locator('.document-editor .callout-block')).toHaveCount(1)
-  await expect(page.locator('.document-editor .diagram-block')).toHaveCount(1)
+  await expect(
+    page.locator('.document-editor .diagram-block:not(.architecture-embed)'),
+  ).toHaveCount(1)
   await expect(page.locator('.diagram-block .diagram-preview')).toHaveAttribute(
     'aria-busy',
     'false',
@@ -415,14 +432,14 @@ try {
     'true',
   )
   await page.screenshot({ path: path.join(output, 'settings-general-dark-ru.png') })
-  await page.getByRole('tab', { name: 'ИИ-агенты · MCP', exact: true }).click()
+  await page.getByRole('tab', { name: 'Плагины', exact: true }).click()
   await expect(page.getByRole('switch', { name: 'Включить MCP' })).toBeVisible()
-  await page.locator('.mcp-settings').scrollIntoViewIfNeeded()
+  await page.locator('.mcp-plugin-card').scrollIntoViewIfNeeded()
   await page.screenshot({ path: path.join(output, 'settings-dark-ru.png') })
-  await page.getByRole('tab', { name: 'ИИ-агенты · MCP', exact: true }).press('End')
+  await page.getByRole('tab', { name: 'Плагины', exact: true }).press('End')
   await expect(page.getByRole('tab', { name: 'О приложении', exact: true })).toBeFocused()
   await expect(page.getByRole('tabpanel', { name: 'О приложении', exact: true })).toContainText(
-    'Версия 1.0.0',
+    'Установленная версия: ' + (await app.evaluate(({ app }) => app.getVersion())),
   )
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(900, 640))
   await expect(async () => {

@@ -1,6 +1,6 @@
 {
   "name": "sheco",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "A local home for your knowledge",
   "author": "Sheco",
@@ -32,7 +32,13 @@
     "test:mcp": "node scripts/mcp-review.mjs",
     "test:improvements": "node scripts/improvements-review.mjs",
     "test:knowledge": "node scripts/knowledge-features-review.mjs",
-    "test:plugins": "node scripts/plugins-review.mjs"
+    "test:plugins": "node scripts/plugins-review.mjs",
+    "test:architecture": "node scripts/architecture-page-review.mjs",
+    "test:jira": "node scripts/jira-review.mjs",
+    "test:jira-inline": "node scripts/jira-inline-review.mjs",
+    "test:file-preview": "node scripts/file-preview-review.mjs",
+    "test:document-tools": "node scripts/document-tools-review.mjs",
+    "test:templates": "node scripts/templates-review.mjs"
   },
   "build": {
     "appId": "app.sheco.desktop",
@@ -96,6 +102,7 @@
     "lucide-react": "^1.52.0",
     "marked": "^18.1.0",
     "mermaid": "12.1.0",
+    "pdfjs-dist": "6.4.299",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "zod": "^4.6.5"

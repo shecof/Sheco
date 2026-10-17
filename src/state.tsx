@@ -1,5 +1,11 @@
+import { filePreviewTab, filePreviewId, attachmentPreviewKind } from './shared/filePreview'
 import { useI18n } from './i18n'
-import { commandBuilderTab, commandBuilderSettingsTab } from './shared/plugins'
+import {
+  isPluginAppTab,
+  pluginAppEnabled,
+  isPluginSettingsTab,
+  isPluginTabVisible,
+} from './shared/plugins'
 import {
   createContext,
   useCallback,
@@ -37,9 +43,12 @@ interface State {
   titleFocusId: string | null
   clearTitleFocus: () => void
   update: (fn: (w: Workspace) => Workspace) => void
+  canNavigate: () => boolean
+  registerNavigationGuard: (guard: () => boolean) => () => void
   editPage: (id: string, patch: Partial<Page>) => void
   editDB: (id: string, patch: Partial<Database>) => void
   openPage: (id: string, newTab?: boolean) => void
+  openAttachment: (id: string) => Promise<void>
   closeTab: (id: string) => void
   newPage: (
     parent?: string | null,
@@ -57,7 +66,7 @@ interface State {
   notify: (text: string) => void
   run: (fn: () => Promise<unknown>) => void
   addAttachments: (items: Attachment[]) => void
-  importPage: () => Promise<void>
+  importPage: (parentId?: string | null) => Promise<boolean>
 }
 const Context = createContext<State>(null!)
 export const useApp = () => useContext(Context)
@@ -73,6 +82,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [remoteEdits, setRemoteEdits] = useState<Record<string, number>>({})
   const [titleFocusId, setTitleFocusId] = useState<string | null>(null)
   const changingSpace = useRef(false)
+  const attachmentOpenSequence = useRef(0)
+  const navigationSequence = useRef(0)
   const current = useRef<Workspace | null>(null)
   const seq = useRef(0)
   const saved = useRef(0)
@@ -80,7 +91,19 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const failed = useRef(false)
   const mcpOperation = useRef<Promise<void> | null>(null)
+  const navigationGuard = useRef<(() => boolean) | null>(null)
+  const registerNavigationGuard = useCallback((guard: () => boolean) => {
+    navigationGuard.current = guard
+    return () => {
+      if (navigationGuard.current === guard) navigationGuard.current = null
+    }
+  }, [])
   const notify = useCallback((text: string) => setToast(text), [])
+  const canNavigate = useCallback(() => {
+    if (navigationGuard.current?.() !== false) return true
+    notify(t('Correct or reset the property draft before leaving this diagram.'))
+    return false
+  }, [notify, t])
   useEffect(() => {
     if (!toast) return
     const id = setTimeout(() => setToast(''), 5500)
@@ -151,8 +174,19 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const update = useCallback(
     (fn: (w: Workspace) => Workspace) => {
       if (!current.current || changingSpace.current) return
-      const next = fn(current.current)
-      if (next === current.current) return
+      const before = current.current
+      let next = fn(before)
+      if (next === before) return
+      const active = before.ui.activeId
+      if (
+        next.ui.activeId !== active ||
+        (before.plugins.projectArchitecture.enabled && !next.plugins.projectArchitecture.enabled) ||
+        (active && next.pages.some((page) => page.id === active && page.deletedAt))
+      ) {
+        if (!canNavigate()) return
+        // A successful flush can itself save the draft. Rebase navigation on that state.
+        if (current.current !== before) next = fn(current.current)
+      }
       current.current = next
       seq.current++
       setW(next)
@@ -160,7 +194,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       if (timer.current) clearTimeout(timer.current)
       if (!failed.current) timer.current = setTimeout(() => void flush().catch(() => {}), 500)
     },
-    [flush],
+    [flush, canNavigate],
   )
   useEffect(
     () =>
@@ -228,6 +262,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   useEffect(
     () =>
       window.sheco.onClose(() => {
+        if (!canNavigate()) return
         void Promise.resolve(mcpOperation.current)
           .then(flush)
           .then(() => window.sheco.readyToClose())
@@ -239,7 +274,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
             ),
           )
       }),
-    [flush, notify],
+    [flush, notify, canNavigate],
   )
   useEffect(
     () => () => {
@@ -254,19 +289,24 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     [notify],
   )
   const openPage = useCallback(
-    (id: string, newTab = false) =>
+    (id: string, newTab = false) => {
+      if (!isPluginTabVisible(id)) return
+      navigationSequence.current++
       update((w) => {
         const plugin =
-          id === commandBuilderSettingsTab ||
-          (id === commandBuilderTab && w.plugins.commandBuilder.enabled)
+          isPluginSettingsTab(id) ||
+          (isPluginAppTab(id) && pluginAppEnabled(w.plugins, id)) ||
+          (w.plugins.filePreview.enabled &&
+            w.attachments.some((a) => a.id === filePreviewId(id) && attachmentPreviewKind(a)))
         if (!plugin && !w.pages.some((p) => p.id === id && !p.deletedAt)) return w
         let tabs = [...w.ui.tabs]
         if (!tabs.includes(id)) {
           if (
             newTab ||
             plugin ||
-            w.ui.activeId === commandBuilderTab ||
-            w.ui.activeId === commandBuilderSettingsTab ||
+            (w.ui.activeId && isPluginAppTab(w.ui.activeId)) ||
+            (w.ui.activeId && isPluginSettingsTab(w.ui.activeId)) ||
+            (w.ui.activeId && filePreviewId(w.ui.activeId)) ||
             !w.ui.activeId
           ) {
             if (tabs.length >= 40) {
@@ -281,8 +321,31 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
           }
         }
         return { ...w, ui: { ...w.ui, tabs, activeId: id } }
-      }),
+      })
+    },
     [update, notify],
+  )
+  const openAttachment = useCallback(
+    async (id: string) => {
+      const request = ++attachmentOpenSequence.current
+      const navigation = navigationSequence.current
+      const workspace = current.current
+      const attachment = workspace?.attachments.find((a) => a.id === id)
+      if (!workspace || !attachment) return
+      if (workspace.plugins.filePreview.enabled && attachmentPreviewKind(attachment)) {
+        await flush()
+        if (
+          current.current?.id !== workspace.id ||
+          changingSpace.current ||
+          attachmentOpenSequence.current !== request ||
+          navigationSequence.current !== navigation ||
+          current.current.ui.activeId !== workspace.ui.activeId
+        )
+          return
+        openPage(filePreviewTab(id), true)
+      } else await window.sheco.openAttachment(id)
+    },
+    [flush, openPage],
   )
   const closeTab = useCallback(
     (id: string) =>
@@ -305,10 +368,24 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       update((w) => ({
         ...w,
         pages: w.pages.map((p) =>
-          p.id === id ? { ...p, ...patch, updatedAt: nextTimestamp(p.updatedAt) } : p,
+          p.id === id
+            ? {
+                ...p,
+                ...patch,
+                ...(p.kind === 'architecture' &&
+                  p.architecture &&
+                  patch.title !== undefined && {
+                    architecture: {
+                      ...(patch.architecture ?? p.architecture),
+                      name: patch.title.trim().slice(0, 120) || t('Untitled architecture'),
+                    },
+                  }),
+                updatedAt: nextTimestamp(p.updatedAt),
+              }
+            : p,
         ),
       })),
-    [update],
+    [update, t],
   )
   const editDB = useCallback(
     (id: string, patch: Partial<Database>) =>
@@ -389,6 +466,14 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
           ...p,
           id: map[p.id],
           title: p.id === id ? p.title + ' (copy)' : p.title,
+          ...(p.architecture && {
+            architecture: {
+              ...p.architecture,
+              name:
+                (p.id === id ? p.title + ' (copy)' : p.title).trim().slice(0, 120) ||
+                t('Untitled architecture'),
+            },
+          }),
           parentId: map[p.parentId ?? ''] ?? p.parentId,
           databaseId: dbMap[p.databaseId ?? ''] ?? p.databaseId,
           order: p.id === id ? p.order + 0.5 : p.order,
@@ -408,7 +493,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       }))
       openPage(map[id], true)
     },
-    [update, openPage],
+    [update, openPage, t],
   )
   const restore = useCallback(
     (id: string) =>
@@ -426,7 +511,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   )
   const transitionSpace = useCallback(
     async (operation: () => Promise<BootData | null>) => {
-      if (changingSpace.current) return
+      if (changingSpace.current || !canNavigate()) return
       await mcpOperation.current
       if (changingSpace.current) return
       changingSpace.current = true
@@ -440,7 +525,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         setBusy(false)
       }
     },
-    [flush, load],
+    [flush, load, canNavigate],
   )
   const switchSpace = useCallback(
     (id: string) => transitionSpace(() => window.sheco.switchSpace(id)),
@@ -465,22 +550,41 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       })),
     [update],
   )
-  const importPage = useCallback(async () => {
-    await flush()
-    const result = await window.sheco.importMarkdown()
-    if (!result) return
-    const page = newPage()
-    editPage(page.id, {
-      title: result.title,
-      description: 'Imported from Markdown',
-      content: {
-        type: 'doc',
-        content: [{ type: 'paragraph', attrs: { importMarkdown: result.text } }],
-      },
-    })
-    const assets = (result as typeof result & { attachments?: Attachment[] }).attachments
-    if (assets) addAttachments(assets)
-  }, [flush, newPage, editPage, addAttachments])
+  const importPage = useCallback(
+    async (parentId: string | null = null) => {
+      const workspaceId = current.current?.id
+      if (!workspaceId || changingSpace.current) return false
+      await flush()
+      if (current.current?.id !== workspaceId || changingSpace.current) return false
+      const result = await window.sheco.importMarkdown()
+      if (!result || current.current?.id !== workspaceId || changingSpace.current) return false
+      const workspace = current.current
+      const parent = workspace.pages.find((page) => page.id === parentId && !page.deletedAt)
+      if (parentId && !parent) {
+        notify(t('The destination page is no longer available.'))
+        return false
+      }
+      const page = newPage(
+        parentId,
+        'page',
+        parent?.kind === 'database'
+          ? (workspace.databases.find((database) => database.pageId === parentId)?.id ?? null)
+          : null,
+      )
+      editPage(page.id, {
+        title: result.title,
+        description: 'Imported from Markdown',
+        content: {
+          type: 'doc',
+          content: [{ type: 'paragraph', attrs: { importMarkdown: result.text } }],
+        },
+      })
+      const assets = (result as typeof result & { attachments?: Attachment[] }).attachments
+      if (assets) addAttachments(assets)
+      return true
+    },
+    [flush, newPage, editPage, addAttachments, notify, t],
+  )
   return (
     <Context.Provider
       value={{
@@ -492,10 +596,13 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         busy,
         remoteEdits,
         update,
+        canNavigate,
+        registerNavigationGuard,
         editPage,
         editDB,
         openPage,
         closeTab,
+        openAttachment,
         newPage,
         titleFocusId,
         clearTitleFocus: () => setTitleFocusId(null),

@@ -2,14 +2,13 @@
 
 Sheco can publish its source independently of distributing installers. The current repository has
 an MIT license and an unsigned CI packaging workflow.
-[The repository](https://github.com/shecof/Sheco) is currently private and can be made public later.
+[The repository](https://github.com/shecof/Sheco) is public.
 Releases are uploaded manually. CI artifacts remain unsigned; macOS release signing and
 notarization use a local Developer ID identity and a notarytool Keychain profile.
 
 ## Publish source
 
-1. Review the repository visibility and enable public access when ready. Verify repository,
-   issue tracker, and release links in the README and package metadata.
+1. Verify repository, issue tracker, and release links in the README and package metadata.
    `private: true` in `package.json` prevents accidental npm publication; it does not prevent publishing source on GitHub.
 2. Confirm the existing MIT license, copyright attribution, and rights to contributed code,
    logo/assets, and sample content. Keep dependency licenses with distributions.
@@ -43,6 +42,18 @@ forced automatic fix that changes the packaging toolchain without verifying the 
 
 Review the updated source preview before preparing release installers. Preserve existing preview
 content. See [development](development/development.md).
+
+Set the intended application version in `package.json` and the root package entries in
+`package-lock.json` before building. Update both README download tables to match the tag and
+artifact names. Runtime UI and MCP version reporting use `app.getVersion()`; do not hardcode
+a separate release number in source. Keep `plugins/README.md`, plugin guides and synthetic
+screenshots current, and review every staged file before committing.
+Publish a stable release with a matching `vMAJOR.MINOR.PATCH` tag, such as `v1.0.1`, and leave
+GitHub's draft/prerelease flags off. The manual in-app checker compares `app.getVersion()` with
+the [latest stable release endpoint](https://docs.github.com/en/rest/releases/releases#get-the-latest-release)
+for this repository. It ignores drafts/prereleases, compares versions numerically and opens
+the matching release page only on request; it does not download or install updates. Publishing
+a release still requires explicit authorization; adding the checker does not publish a version.
 
 Build the appropriate artifacts on the target platform:
 
@@ -135,3 +146,16 @@ on macOS and Windows, packages the platform, and uploads CI artifacts. macOS aut
 discovery is disabled. The workflow does not publish releases, configure signing/notarization,
 run every specialized review suite, or independently prove both macOS architectures.
 CI artifact screenshots come from synthetic smoke-test data; review them before public reuse.
+
+## Publish the verified release
+
+After explicit publication authorization, push the reviewed source commit to the repository and
+wait for its macOS/Windows CI results. Create the matching version tag on that exact commit.
+Prepare release notes covering user-visible changes, signing, actual checks and remaining
+platform limits; link the CI run. Upload the six platform artifacts, their final `SHA256SUMS.txt`
+and a `BUILD-INFO.json` identifying the commit, tool versions, checks and artifact hashes.
+Keep signing credentials, internal logs and unpacked app directories out of release assets.
+
+Prepare a draft while files upload, verify its asset names, sizes and checksums, then publish
+as a stable release and mark it latest. Confirm both README download tables resolve and that
+the latest-stable API returns the intended tag. Leave previous releases and local builds intact.

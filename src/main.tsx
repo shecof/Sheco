@@ -4,6 +4,7 @@ import { WorkspaceProvider } from './state'
 import { App } from './App'
 import './styles.css'
 import { LanguageProvider } from './i18n'
+import { AppUpdateProvider } from './appUpdates'
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { error: string }> {
   state = { error: '' }
   static getDerivedStateFromError(error: Error) {
@@ -26,7 +27,9 @@ createRoot(document.getElementById('root')!).render(
   <LanguageProvider>
     <ErrorBoundary>
       <WorkspaceProvider>
-        <App />
+        <AppUpdateProvider>
+          <App />
+        </AppUpdateProvider>
       </WorkspaceProvider>
     </ErrorBoundary>
   </LanguageProvider>,

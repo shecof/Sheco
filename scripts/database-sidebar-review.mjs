@@ -113,7 +113,7 @@ async function startDrag(from, target, fraction = 0.5) {
 }
 async function drop(from, target, position, screenshot) {
   await startDrag(from, target, position === 'before' ? 0.1 : position === 'after' ? 0.9 : 0.5)
-  const isRoot = await target.evaluate((el) => el.matches('.sidebar-add'))
+  const isRoot = await target.evaluate((el) => el.matches('.sidebar-empty-space'))
   const marker = position === 'inside' ? target : target.locator('..')
   await expect(marker).toHaveClass(new RegExp(isRoot ? 'drop-target' : 'tree-drop-' + position))
   if (position !== 'inside') {
@@ -376,7 +376,7 @@ try {
   await page.mouse.up()
   expect((await snapshot()).pages).toEqual(beforeInvalid)
   await expect(treeRow('Nmap')).toHaveAttribute('draggable', 'false')
-  await drop(treeRow(scan.title), page.locator('.sidebar-add'), 'inside')
+  await drop(treeRow(scan.title), page.locator('.sidebar-empty-space'), 'inside')
   expect((await snapshot()).pages.find((p) => p.id === scan.id).parentId).toBe(null)
   console.log('Sidebar: native pointer reorder, subtrees, nesting, invalid cycle rejection')
   await page.getByRole('button', { name: 'Settings', exact: true }).click()

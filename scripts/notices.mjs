@@ -31,6 +31,20 @@ async function visit(name, from) {
     if ((await fs.stat(path.join(directory, file))).isFile())
       content += '\n' + file + '\n' + (await fs.readFile(path.join(directory, file), 'utf8'))
   }
+  if (manifest.name === 'pdfjs-dist') {
+    for (const folder of ['cmaps', 'standard_fonts', 'wasm', 'iccs']) {
+      for (const file of await fs.readdir(path.join(directory, folder))) {
+        if (/^LICENSE/.test(file))
+          content +=
+            '\n' +
+            folder +
+            '/' +
+            file +
+            '\n' +
+            (await fs.readFile(path.join(directory, folder, file), 'utf8'))
+      }
+    }
+  }
   notices.push(
     `${manifest.name} ${manifest.version}\nLicense: ${typeof manifest.license === 'string' ? manifest.license : JSON.stringify(manifest.license ?? 'See package source')}\n${content || 'License text is provided in the package source.'}`,
   )

@@ -16,6 +16,7 @@
 workspace.json
 spaces.json
 mcp.json
+jira-credentials.json
 writer.lock
 **/metadata/backups/
 **/metadata/manual-backups/

@@ -1,8 +1,15 @@
 import type { Attachment, BootData, Workspace } from './model'
 import type { McpConfig, McpStatus, McpRequest, McpReply } from './mcp'
 import type { CommandBuilderConfig } from './plugins'
+import type { JiraCredentialStatus, JiraCredentialsInput, JiraIssue } from './jira'
+import type { UpdateResult, AppUpdateState, UpdateSettings } from './appUpdates'
 export interface DesktopAPI {
   platform: string
+  appVersion(): Promise<string>
+  checkUpdates(): Promise<UpdateResult>
+  updateState(): Promise<AppUpdateState>
+  configureUpdates(settings: UpdateSettings): Promise<AppUpdateState>
+  onUpdateState(callback: (state: AppUpdateState) => void): () => void
   setLanguage(language: 'en' | 'ru'): Promise<void>
   boot(): Promise<BootData>
   save(
@@ -16,6 +23,8 @@ export interface DesktopAPI {
   attach(): Promise<Attachment[]>
   attachBytes(name: string, bytes: ArrayBuffer): Promise<Attachment>
   openAttachment(id: string): Promise<void>
+  readPreviewPdf(input: { workspaceId: string; attachmentId: string }): Promise<ArrayBuffer>
+  readPreviewText(input: { workspaceId: string; attachmentId: string }): Promise<string>
   external(url: string): Promise<void>
   exportPage(id: string, format: 'markdown' | 'pdf'): Promise<string | null>
   exportDatabase(id: string): Promise<string | null>
@@ -27,6 +36,10 @@ export interface DesktopAPI {
   copyText(text: string): Promise<void>
   importPluginSettings(): Promise<CommandBuilderConfig | null>
   exportPluginSettings(config: CommandBuilderConfig): Promise<string | null>
+  jiraStatus(workspaceId: string, baseUrl?: string): Promise<JiraCredentialStatus>
+  configureJira(input: JiraCredentialsInput): Promise<void>
+  forgetJiraToken(workspaceId: string, baseUrl?: string): Promise<void>
+  jiraIssue(input: { workspaceId: string; baseUrl: string; issueKey: string }): Promise<JiraIssue>
   mcpStatus(): Promise<McpStatus>
   configureMcp(config: McpConfig): Promise<McpStatus>
   rotateMcpToken(): Promise<McpStatus>

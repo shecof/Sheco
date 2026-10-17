@@ -53,7 +53,10 @@ await fs.writeFile(
 let app, page
 const errors = []
 async function launch() {
-  app = await electron.launch({ args: ['.'], env: { ...process.env, SHECO_DATA_DIR: root } })
+  app = await electron.launch({
+    args: [process.env.SHECO_TEST_MAIN ?? '.'],
+    env: { ...process.env, SHECO_DATA_DIR: root },
+  })
   page = await app.firstWindow()
   page.on('pageerror', (e) => errors.push(e.message))
   await expect(page.locator('.save-status')).toBeVisible({ timeout: 20000 })
@@ -169,9 +172,46 @@ try {
     .click()
   await expect(page.getByText('No plugins enabled', { exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Manage plugins', exact: true }).click()
-  await page.getByRole('switch', { name: 'Enable command builder' }).click()
+  await expect(
+    page
+      .locator('.plugin-card')
+      .filter({ has: page.getByRole('switch', { name: 'Enable command builder', exact: true }) })
+      .locator('.plugin-commands'),
+  ).not.toHaveAttribute('open', '')
   await page
-    .locator('.plugin-settings')
+    .locator('.plugin-card')
+    .filter({ has: page.getByRole('switch', { name: 'Enable command builder', exact: true }) })
+    .locator('summary')
+    .click()
+  await expect(
+    page
+      .locator('.plugin-card')
+      .filter({ has: page.getByRole('switch', { name: 'Enable command builder', exact: true }) })
+      .locator('.plugin-commands'),
+  ).toContainText('/commands')
+  await expect(
+    page
+      .locator('.plugin-card')
+      .filter({ has: page.getByRole('switch', { name: 'Enable command builder', exact: true }) })
+      .locator('.plugin-commands-heading'),
+  ).toHaveText('Commands1')
+  await page.getByRole('switch', { name: 'Enable command builder' }).click()
+  await expect(
+    page
+      .locator('.plugin-card')
+      .filter({ has: page.getByRole('switch', { name: 'Enable command builder', exact: true }) })
+      .locator('.plugin-commands-heading'),
+  ).toHaveText('Commands1')
+  await expect(
+    page
+      .locator('.plugin-card')
+      .filter({ has: page.getByRole('switch', { name: 'Enable command builder', exact: true }) })
+      .getByText('Enabled', { exact: true }),
+  ).toHaveCount(0)
+  await page.screenshot({ path: path.join(output, 'settings-commands-light-en.png') })
+  await page
+    .locator('.plugin-settings .plugin-card')
+    .filter({ has: page.getByRole('switch', { name: 'Enable command builder', exact: true }) })
     .getByRole('button', { name: 'Configure', exact: true })
     .click()
   await expect(page.getByRole('dialog', { name: 'Settings', exact: true })).toHaveCount(0)
@@ -305,7 +345,7 @@ try {
   expect(exported).not.toHaveProperty('catalogRevision')
   expect(
     JSON.parse(await fs.readFile(snapshot, 'utf8')).plugins.commandBuilder.catalogRevision,
-  ).toBe(2)
+  ).toBe(3)
   expect(exported).not.toHaveProperty('pages')
   expect(exported.tools.at(-1).command).toEqual(['audittool', 'inspect', 'files'])
   await catalogAction('Edit JSON')
@@ -392,6 +432,9 @@ try {
   await expect(
     page.getByRole('dialog', { name: 'Parameter help: Targets', exact: true }),
   ).toContainText('One host or network per line')
+  const helpSize = await page.locator('.command-help-popover').boundingBox()
+  expect(helpSize.width).toBeLessThanOrEqual(240)
+  expect(helpSize.height).toBeLessThan(66)
   await page.screenshot({ path: path.join(output, 'builder-help-light-en.png') })
   await page.keyboard.press('Escape')
   await expect(
@@ -450,6 +493,30 @@ try {
   await expect(page.getByRole('button', { name: 'Add parameter', exact: true })).toBeFocused()
   await page.getByRole('textbox', { name: 'Targets', exact: true }).fill('192.0.2.1')
   const compactTarget = await compactParameter('Targets')
+  const targetLine = await page
+    .getByRole('textbox', { name: 'Targets', exact: true })
+    .evaluate((node) => {
+      const style = getComputedStyle(node)
+      return {
+        height: node.getBoundingClientRect().height,
+        extra:
+          node.clientHeight -
+          parseFloat(style.paddingTop) -
+          parseFloat(style.paddingBottom) -
+          parseFloat(style.lineHeight),
+      }
+    })
+  expect(targetLine.height).toBe(34)
+  expect(Math.abs(targetLine.extra)).toBeLessThan(1)
+  // Configure from the builder itself must open/reuse the catalog tab and retain command values.
+  await page
+    .locator('.command-builder-heading')
+    .getByRole('button', { name: 'Configure', exact: true })
+    .click()
+  await expect(page.locator('.plugin-configuration')).toBeVisible()
+  await expect(page.locator('.tabs .tab')).toHaveCount(3)
+  await catalogAction('Open command builder')
+  await expect(page.getByRole('textbox', { name: 'Targets', exact: true })).toHaveValue('192.0.2.1')
   await pick('Extended output', 'TCP ports · comma-separated')
   await expect(page.locator('.command-result pre')).toHaveText(
     'nmap 192.0.2.1 | grep /tcp | cut -f1 -d/ | paste -s -d, -',
@@ -545,6 +612,20 @@ try {
   await expect(page.locator('.command-result pre')).toHaveText(
     'nmap --top-ports 100 -sV -A --script vuln -T3 192.0.2.1',
   )
+  await page.getByRole('button', { name: 'Extended output', exact: true }).click()
+  await expect(page.getByRole('option').nth(1)).toHaveText('NSE · results with hosts and ports')
+  await expect(page.getByRole('option', { name: 'NSE · results only', exact: true })).toBeVisible()
+  await expect(
+    page.getByRole('option', { name: 'NSE · scripts with results', exact: true }),
+  ).toBeVisible()
+  await page.screenshot({ path: path.join(output, 'nse-output-menu-light-en.png') })
+  await page
+    .getByRole('option', { name: 'NSE · results with hosts and ports', exact: true })
+    .click()
+  await expect(page.locator('.command-result pre')).toContainText('--script vuln')
+  await expect(page.locator('.command-result pre')).toContainText('| awk ')
+  await expect(page.locator('.command-result pre')).toContainText('Host) script results:')
+  await pick('Extended output', 'Standard output')
   await page.screenshot({ path: path.join(output, 'nmap-expanded-light-en.png') })
   await page
     .getByRole('textbox', { name: 'NSE scripts', exact: true })
@@ -733,7 +814,8 @@ try {
   )
   await page.getByRole('switch', { name: 'Enable command builder' }).click()
   await page
-    .locator('.plugin-settings')
+    .locator('.plugin-settings .plugin-card')
+    .filter({ has: page.getByRole('switch', { name: 'Enable command builder', exact: true }) })
     .getByRole('button', { name: 'Configure', exact: true })
     .click()
   await expect(page.locator('.tabs .tab')).toHaveCount(2)
@@ -744,7 +826,8 @@ try {
   await page.getByRole('button', { name: 'Русский', exact: true }).click()
   await page.getByRole('tab', { name: 'Плагины', exact: true }).click()
   await page
-    .locator('.plugin-settings')
+    .locator('.plugin-settings .plugin-card')
+    .filter({ has: page.getByRole('switch', { name: 'Включить конструктор команд', exact: true }) })
     .getByRole('button', { name: 'Настроить', exact: true })
     .click()
   await expect(page.getByRole('dialog', { name: 'Настройки', exact: true })).toHaveCount(0)
@@ -811,6 +894,12 @@ try {
   ).toBeInViewport()
   await page.screenshot({ path: path.join(output, 'builder-dark-ru.png') })
   const chainRussian = await centeredChain()
+  await page.getByRole('button', { name: 'Подсказка к параметру: Цели', exact: true }).click()
+  const russianHelpSize = await page.locator('.command-help-popover').boundingBox()
+  expect(russianHelpSize.width).toBeLessThanOrEqual(240)
+  expect(russianHelpSize.height).toBeLessThan(66)
+  await page.screenshot({ path: path.join(output, 'builder-help-dark-ru.png') })
+  await page.keyboard.press('Escape')
   await page.getByRole('button', { name: 'Инструмент', exact: true }).click()
   const toolPickerBounds = await page
     .getByRole('listbox', { name: 'Инструмент', exact: true })
@@ -951,7 +1040,8 @@ try {
   await page.getByRole('button', { name: 'Светлая', exact: true }).click()
   await page.getByRole('tab', { name: 'Плагины', exact: true }).click()
   await page
-    .locator('.plugin-settings')
+    .locator('.plugin-settings .plugin-card')
+    .filter({ has: page.getByRole('switch', { name: 'Включить конструктор команд', exact: true }) })
     .getByRole('button', { name: 'Настроить', exact: true })
     .click()
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1440, 960))
@@ -1068,6 +1158,52 @@ try {
   expect(final.plugins.commandBuilder.config).toEqual(imported)
   expect(final.ui.tabs).toContain('plugin:command-builder')
   expect(final.ui.tabs).toContain('plugin:command-builder-settings')
+  // The advertised slash shortcut opens the existing plugin tab and leaves note content intact.
+  await page.locator('.tabs .tab-open').first().click()
+  const tabCount = await page.locator('.tabs .tab').count()
+  await page.locator('.document-editor').evaluate((element) => {
+    const editor = element.editor
+    editor
+      .chain()
+      .focus()
+      .setTextSelection(editor.state.doc.content.size - 1)
+      .run()
+  })
+  await expect(page.locator('.document-editor')).toBeFocused()
+  await page.keyboard.type('/commands')
+  await expect(page.locator('.command-palette')).toBeVisible()
+  await page.getByRole('option', { name: 'Конструктор команд', exact: false }).click()
+  await expect(page.locator('.command-builder')).toBeVisible()
+  expect(await page.locator('.tabs .tab').count()).toBe(tabCount)
+  await page.locator('.tabs .tab-open').first().click()
+  expect(
+    await page.locator('.document-editor').evaluate((element) => element.editor.getJSON()),
+  ).toEqual(originalPages[0].content)
+  await page
+    .locator('.sidebar-footer')
+    .getByRole('button', { name: 'Настройки', exact: true })
+    .click()
+  await page.getByRole('tab', { name: 'Плагины', exact: true }).click()
+  await page.screenshot({ path: path.join(output, 'settings-commands-light-ru.png') })
+  await page.getByRole('switch', { name: 'Включить конструктор команд' }).click()
+  await page.getByRole('button', { name: 'Закрыть', exact: true }).click()
+  await page.locator('.document-editor').evaluate((element) =>
+    element.editor
+      .chain()
+      .focus()
+      .setTextSelection(element.editor.state.doc.content.size - 1)
+      .run(),
+  )
+  await expect(page.locator('.document-editor')).toBeFocused()
+  await page.keyboard.type('/commands')
+  await expect(page.locator('.command-palette')).toBeVisible()
+  await expect(page.locator('.command-palette')).not.toContainText('Конструктор команд')
+  await page.keyboard.press('Escape')
+  await page.locator('.document-editor').evaluate((element) => element.editor.commands.undo())
+  expect(
+    await page.locator('.document-editor').evaluate((element) => element.editor.getJSON()),
+  ).toEqual(originalPages[0].content)
+  await saved()
   expect(errors).toEqual([])
   await fs.writeFile(
     path.join(output, 'verification.json'),

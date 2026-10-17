@@ -7,10 +7,26 @@ organize databases, and keep your documents in folders you own. No account or ho
 is required. The interface supports **English and Russian**.
 
 [Русский](README.ru.md) · [User guide](docs/user-guide.md) ·
-[Documentation](docs/README.md) · [Contributing](CONTRIBUTING.md) ·
+[Plugins and screenshots](plugins/README.md) · [Documentation](docs/README.md) · [Contributing](CONTRIBUTING.md) ·
 [Repository](https://github.com/shecof/Sheco)
 
 ![Sheco's block editor with a project notebook, tasks, connected pages, and an outline](docs/screenshots/editor-en.png)
+
+## Install
+
+Download [Sheco 1.0.1](https://github.com/shecof/Sheco/releases/tag/v1.0.1):
+
+| Platform            | Downloads                                                                                                                                                                               | Signing                                    |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| macOS Apple Silicon | [DMG](https://github.com/shecof/Sheco/releases/download/v1.0.1/Sheco-1.0.1-mac-arm64.dmg) · [ZIP](https://github.com/shecof/Sheco/releases/download/v1.0.1/Sheco-1.0.1-mac-arm64.zip)   | Developer ID signed and notarized by Apple |
+| macOS Intel         | [DMG](https://github.com/shecof/Sheco/releases/download/v1.0.1/Sheco-1.0.1-mac-x64.dmg) · [ZIP](https://github.com/shecof/Sheco/releases/download/v1.0.1/Sheco-1.0.1-mac-x64.zip)       | Developer ID signed and notarized by Apple |
+| Windows x64         | [Installer](https://github.com/shecof/Sheco/releases/download/v1.0.1/Sheco-1.0.1-win-x64.exe) · [ZIP](https://github.com/shecof/Sheco/releases/download/v1.0.1/Sheco-1.0.1-win-x64.zip) | Unsigned                                   |
+
+On macOS, open the DMG and drag Sheco to Applications, or extract the ZIP and move the app there.
+On Windows, run the installer, or extract the ZIP and open `Sheco.exe`. Windows may show an
+unknown-publisher warning because these Windows builds are unsigned.
+
+The release includes `SHA256SUMS.txt` and the checks and platform limits for these exact files.
 
 ## Features
 
@@ -18,17 +34,21 @@ is required. The interface supports **English and Russian**.
   and find and replace within a page.
 - **Block editor:** rich text, lists and tasks, folds, callouts, code with highlighting and
   comments, math, simple tables, and Mermaid diagrams with a visual editor for basic flowcharts.
-- **Local media:** images, galleries, captions, reversible cropping, and file attachments.
+- **Local media:** images, galleries, captions, reversible cropping, file attachments, and an optional
+  PDF/text/video preview plugin with separate tabs.
 - **Databases:** records are complete pages, with typed properties, relations, filters, sorting,
   and table, list, board, and gallery views. Embed a database inside a note.
 - **Portable data:** Markdown import/export, CSV database export, PDF page export, and complete
   workspace exports with attachments.
 - **Durable saves:** revision checks, atomic replacement, backup checkpoints, recovery,
   and recoverable Trash.
-- **Optional integrations:** authenticated local MCP access for AI clients, and a configurable
-  command builder that copies commands. MCP is disabled by default; the builder never runs commands.
 - **Comfortable reading:** light/dark/system appearance, accent colors, page outline,
   reading width and font-size controls.
+- **Plugins when you need them:** architecture diagrams and resource budgets, document templates,
+  data transformations, file previews, Jira issues, a command builder, and AI access through MCP.
+  [Explore all plugins with demonstrations and screenshots](plugins/README.md).
+- **Update checks:** check manually in Settings or opt into a startup check, with a link to the
+  release page to install the next version.
 
 ## A closer look
 
@@ -52,40 +72,39 @@ documents nearby as file cards or compact attachments.
 
 ![A note in Sheco with a local illustration, caption, and Markdown, CSV, and image attachments](docs/screenshots/images-files-en.png)
 
+**Plan a project's architecture.** Place servers, databases and websites on a diagram,
+connect them and track resource capacity. Each diagram opens as its own page and stays
+visible in your notes through a live preview.
+[Explore the architecture plugin](plugins/project-architecture/README.md).
+
+![Architecture diagram with sites and connected objects](plugins/project-architecture/editor-canvas-light-en.png)
+
 **Build commands with a plugin.** Choose a tool, add parameters, and copy the assembled command
-for Bash/Zsh or PowerShell. The optional command builder never executes commands.
+for Bash/Zsh or PowerShell. Open it with `/commands` or the Plugins menu.
+The optional command builder never executes commands.
 See the [plugin guide](docs/plugins.md) for tool configuration and portable catalogs.
 
-![Sheco's command builder plugin assembling an nmap command from targets, ports, and selected options](docs/screenshots/command-builder-en.png)
+![Sheco's command builder plugin assembling an nmap command from targets, ports, and selected options](plugins/command-builder/screenshots/builder-light-en.png)
+
+**Keep Jira tasks alongside your notes.** The optional Jira plugin connects to Jira
+Server / Data Center using a PAT, or Jira Cloud using an email and API token
+(with or without scopes). Connect several servers with separate credentials and choose a server
+when inserting an issue. Insert detailed issue cards with
+status and due date, or inline key/status references within text and lists. Saved snapshots work
+offline; refresh them when needed. See the [plugin catalog and screenshots](plugins/README.md).
 
 Screenshots show the macOS app with fictional demo content. [About the screenshots](docs/screenshots/README.md).
 
 ## Project status
 
 Sheco is in active development. This repository contains source code and a macOS/Windows CI
-workflow. The repository is currently private; downloads in
-[Releases](https://github.com/shecof/Sheco/releases) are available to people with repository access.
+workflow. Source and downloads are available in the public repository's
+[Releases](https://github.com/shecof/Sheco/releases).
 Linux packaging and runtime verification are not provided.
 
 Check the [CI results](https://github.com/shecof/Sheco/actions) for the revision you use.
 A configured CI job or an existing installer is not proof that the current revision passed on
 every platform. See [release preparation](docs/releasing.md) for distribution requirements.
-
-## Install
-
-Download [Sheco 1.0.0](https://github.com/shecof/Sheco/releases/tag/v1.0.0):
-
-| Platform            | Downloads                                                                                                                                                                               | Signing                                    |
-| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
-| macOS Apple Silicon | [DMG](https://github.com/shecof/Sheco/releases/download/v1.0.0/Sheco-1.0.0-mac-arm64.dmg) · [ZIP](https://github.com/shecof/Sheco/releases/download/v1.0.0/Sheco-1.0.0-mac-arm64.zip)   | Developer ID signed and notarized by Apple |
-| macOS Intel         | [DMG](https://github.com/shecof/Sheco/releases/download/v1.0.0/Sheco-1.0.0-mac-x64.dmg) · [ZIP](https://github.com/shecof/Sheco/releases/download/v1.0.0/Sheco-1.0.0-mac-x64.zip)       | Developer ID signed and notarized by Apple |
-| Windows x64         | [Installer](https://github.com/shecof/Sheco/releases/download/v1.0.0/Sheco-1.0.0-win-x64.exe) · [ZIP](https://github.com/shecof/Sheco/releases/download/v1.0.0/Sheco-1.0.0-win-x64.zip) | Unsigned                                   |
-
-On macOS, open the DMG and drag Sheco to Applications, or extract the ZIP and move the app there.
-On Windows, run the installer, or extract the ZIP and open `Sheco.exe`. Windows may show an
-unknown-publisher warning because these Windows builds are unsigned.
-
-The release includes `SHA256SUMS.txt` and the checks and platform limits for these exact files.
 
 ## Try it from source
 
@@ -154,6 +173,7 @@ the [development guides](docs/development/README.md) describe the implementation
 | `tests/`    | Unit and regression tests                                                         |
 | `scripts/`  | Development, build, packaging helpers, and desktop review suites                  |
 | `build/`    | Logo and platform icon assets; dependency notices generated during builds         |
+| `plugins/`  | Built-in plugin catalog, usage guides, and demonstration screenshots              |
 | `docs/`     | User documentation, development guides, and release preparation                   |
 | `.github/`  | CI and contribution templates                                                     |
 

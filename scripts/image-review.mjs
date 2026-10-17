@@ -204,7 +204,16 @@ try {
   await page.getByRole('button', { name: 'Cancel', exact: true }).click()
   await saved()
   expect((await imageNode()).attrs.src).toBe(cropped.attrs.src)
-  await page.getByRole('button', { name: 'Reset crop', exact: true }).click()
+  await expect(
+    page.locator('.image-toolbar').getByRole('button', { name: 'Reset crop', exact: true }),
+  ).toHaveCount(0)
+  await page.getByRole('button', { name: 'Crop', exact: true }).click()
+  await page.screenshot({ path: path.join(output, 'reset-inside-crop.png') })
+  await page
+    .getByRole('dialog', { name: 'Crop image' })
+    .getByRole('button', { name: 'Reset crop', exact: true })
+    .click()
+  await expect(page.getByRole('dialog', { name: 'Crop image' })).toHaveCount(0)
   await expect(img).toHaveAttribute('src', resized.attrs.src)
   await page.keyboard.press(`${mod}+z`)
   await expect(img).toHaveAttribute('src', cropped.attrs.src)

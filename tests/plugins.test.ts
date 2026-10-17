@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { execFileSync } from 'node:child_process'
 import { workspaceSchema } from '../src/shared/model'
 import { seedWorkspace } from '../src/shared/seed'
-import { builtinToolsV1 } from '../src/shared/pluginTools'
+import { builtinToolsV1, builtinToolsV2 } from '../src/shared/pluginTools'
 import {
   buildCommand,
   commandBuilderTab,
@@ -14,6 +14,12 @@ import {
   parsePluginJson,
   quoteArgument,
   type CommandValues,
+  documentTemplatesTab,
+  documentTemplatesSettingsTab,
+  dataToolsTab,
+  isPluginTabVisible,
+  projectArchitectureSettingsTab,
+  projectArchitectureTab,
 } from '../src/shared/plugins'
 
 const config = defaultCommandBuilderConfig()
@@ -26,6 +32,34 @@ const values = (input: Record<string, string | boolean>): CommandValues =>
     ]),
   )
 describe('workspace plugins', () => {
+  it('restores template entry points while retaining enabled legacy libraries and saved tabs', () => {
+    const original = seedWorkspace('Retained templates', false)
+    original.plugins.documentTemplates.enabled = true
+    original.plugins.documentTemplates.templates = [
+      {
+        id: crypto.randomUUID(),
+        name: 'Saved template',
+        icon: 'file',
+        description: '',
+        content: {
+          type: 'doc',
+          content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Keep this library.' }] }],
+        },
+      },
+    ]
+    original.ui.tabs = [original.pages[0].id, documentTemplatesTab, documentTemplatesSettingsTab]
+    original.ui.activeId = documentTemplatesSettingsTab
+    const parsed = workspaceSchema.parse(original)
+    expect(parsed.plugins.documentTemplates).toEqual(original.plugins.documentTemplates)
+    expect(parsed.ui.tabs).toEqual(original.ui.tabs)
+    expect(parsed.ui.activeId).toBe(documentTemplatesSettingsTab)
+    expect(isPluginTabVisible(documentTemplatesTab)).toBe(true)
+    expect(isPluginTabVisible(documentTemplatesSettingsTab)).toBe(true)
+    expect(isPluginTabVisible(dataToolsTab)).toBe(true)
+    expect(isPluginTabVisible(projectArchitectureSettingsTab)).toBe(true)
+    expect(isPluginTabVisible(projectArchitectureTab)).toBe(false)
+    expect(isPluginTabVisible(original.pages[0].id)).toBe(true)
+  })
   it('upgrades untouched old catalogs once while preserving edits, deletion, ordering and pages', () => {
     const original = seedWorkspace()
     const legacy = JSON.parse(JSON.stringify(original))
@@ -46,7 +80,7 @@ describe('workspace plugins', () => {
     const next = workspaceSchema.parse(legacy)
     expect(next.pages).toEqual(original.pages)
     expect(next.ui).toEqual(original.ui)
-    expect(next.plugins.commandBuilder).toMatchObject({ enabled: true, catalogRevision: 2 })
+    expect(next.plugins.commandBuilder).toMatchObject({ enabled: true, catalogRevision: 3 })
     expect(next.plugins.commandBuilder.config.tools).toEqual([custom, customNmap, tool('ffuf')])
     // A later imported legacy catalog stays exactly as imported; deleted tools stay deleted.
     next.plugins.commandBuilder.config = old
@@ -56,6 +90,35 @@ describe('workspace plugins', () => {
     const upgraded = pluginsSchema.parse({ commandBuilder: { config: old } })
     expect(upgraded.commandBuilder.config).toEqual(config)
     expect(pluginsSchema.parse(upgraded)).toEqual(upgraded)
+  })
+  it('upgrades untouched revision-2 tools without restoring deleted or customized output templates', () => {
+    const previous = commandBuilderConfigSchema.parse({ ...config, tools: builtinToolsV2 })
+    const custom = { ...previous.tools[1], description: 'Team fields' }
+    const source = {
+      commandBuilder: {
+        enabled: true,
+        catalogRevision: 2,
+        config: { ...previous, tools: [custom, previous.tools[0]] },
+      },
+    }
+    const original = structuredClone(source)
+    const next = pluginsSchema.parse(source)
+    expect(next.commandBuilder.catalogRevision).toBe(3)
+    expect(next.commandBuilder.config.tools).toEqual([custom, tool('nmap')])
+    expect(source).toEqual(original)
+    expect(pluginsSchema.parse(next)).toEqual(next)
+    for (const edited of [
+      { ...previous.tools[0], description: 'Our nmap' },
+      { ...previous.tools[0], outputPresets: previous.tools[0].outputPresets.slice(1) },
+      { ...previous.tools[0], outputPresets: [...previous.tools[0].outputPresets].reverse() },
+    ]) {
+      const changed = pluginsSchema.parse({
+        commandBuilder: { ...source.commandBuilder, config: { ...previous, tools: [edited] } },
+      })
+      expect(changed.commandBuilder.config.tools).toEqual([edited])
+    }
+    next.commandBuilder.config = previous
+    expect(pluginsSchema.parse(next).commandBuilder.config).toEqual(previous)
   })
   it('opens legacy snapshots with disabled defaults and preserves every page', () => {
     const original = seedWorkspace()
@@ -216,6 +279,77 @@ describe('command assembly', () => {
       [tool('nmap').outputPresets[0], tool('nmap').outputPresets[0]],
     ])
       expect(commandToolSchema.safeParse({ ...tool('nmap'), outputPresets }).success).toBe(false)
+  })
+  it('retains complete NSE text, host/port context and unique script names in distinct pipelines', () => {
+    const lines = [
+      'Starting Nmap',
+      'Pre-scan script results:',
+      '|_broadcast-demo: fixture',
+      'Nmap scan report for 192.0.2.1',
+      'Host is up.',
+      'PORT STATE SERVICE',
+      '80/tcp open http',
+      '| demo-vuln:',
+      '|   State: VULNERABLE',
+      '|   Details: synthetic finding',
+      '|_  end of details',
+      '|_http-title: synthetic page',
+      '53/udp open domain',
+      'Host script results:',
+      '|_host-demo: fixture',
+      'Nmap scan report for 192.0.2.2',
+      'PORT STATE SERVICE',
+      '443/tcp open https',
+      '|_http-title: another page',
+      'Post-scan script results:',
+      '|_summary-demo: fixture',
+      'Nmap done.',
+    ]
+    const run = (preset: string) => {
+      const result = buildCommand(
+        tool('nmap'),
+        values({ target: '192.0.2.1', nse: 'vuln' }),
+        'posix',
+        preset,
+      )
+      expect(result.issues).toEqual([])
+      expect(result.command).toContain('nmap --script vuln 192.0.2.1 | ')
+      expect(
+        buildCommand(tool('nmap'), values({ target: '192.0.2.1' }), 'powershell', preset).issues[0]
+          .message,
+      ).toBe('Output preset is unavailable for this shell')
+      if (process.platform === 'win32') return undefined
+      return execFileSync(
+        '/bin/sh',
+        ['-c', result.command.slice(result.command.indexOf(' | ') + 3)],
+        {
+          input: lines.join('\n') + '\n',
+          encoding: 'utf8',
+        },
+      ).trim()
+    }
+    const context = run('nse-context'),
+      results = run('nse-results'),
+      names = run('nse-names')
+    if (process.platform === 'win32') return
+    expect(context).toBe(lines.filter((_, i) => ![0, 4, 21].includes(i)).join('\n'))
+    expect(results).toBe(
+      [
+        'Pre-scan script results:',
+        '|_broadcast-demo: fixture',
+        '| demo-vuln:',
+        '|   State: VULNERABLE',
+        '|   Details: synthetic finding',
+        '|_  end of details',
+        '|_http-title: synthetic page',
+        'Host script results:',
+        '|_host-demo: fixture',
+        '|_http-title: another page',
+        'Post-scan script results:',
+        '|_summary-demo: fixture',
+      ].join('\n'),
+    )
+    expect(names).toBe('broadcast-demo\ndemo-vuln\nhost-demo\nhttp-title\nsummary-demo')
   })
   it('offers portable wordlist suggestions without restricting custom paths or repeated values', () => {
     const portable = parsePluginJson(JSON.stringify(config))

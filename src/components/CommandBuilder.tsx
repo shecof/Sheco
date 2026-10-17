@@ -42,9 +42,19 @@ export function CommandBuilder({ onSettings }: { onSettings: () => void }) {
   ) as CommandValues
   const outputKey = `${tool.id}:${shell}`
   const outputPresetId = Object.hasOwn(outputs, outputKey) ? outputs[outputKey] : ''
+  const nseSelected =
+    tool.id === 'nmap' &&
+    tool.parameters.some(
+      (parameter) =>
+        ['--script', '-sC', '-A'].includes(parameter.flag) &&
+        values[parameter.id].enabled &&
+        (parameter.type === 'boolean' || !!values[parameter.id].value.trim()),
+    )
   const outputPresets = tool.outputPresets.filter(
     (preset) => preset.shell === 'any' || preset.shell === shell,
   )
+  if (nseSelected)
+    outputPresets.sort((a, b) => Number(b.id.startsWith('nse-')) - Number(a.id.startsWith('nse-')))
   const result = buildCommand(tool, values, shell, outputPresetId)
   // Old values must not acquire a different meaning after editing/importing definitions.
   useEffect(() => {
@@ -263,7 +273,7 @@ export function CommandBuilder({ onSettings }: { onSettings: () => void }) {
       <header className="command-builder-heading">
         <Terminal size={21} />
         <h1>{t('Command builder')}</h1>
-        <button className="button" onClick={onSettings}>
+        <button className="button" onClick={() => onSettings()}>
           <Settings2 size={14} />
           {t('Configure')}
         </button>

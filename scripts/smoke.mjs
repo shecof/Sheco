@@ -12,7 +12,7 @@ async function launch() {
   app = await electron.launch({
     ...(process.env.SHECO_TEST_EXECUTABLE
       ? { executablePath: process.env.SHECO_TEST_EXECUTABLE, args: [] }
-      : { args: ['.'] }),
+      : { args: [process.env.SHECO_TEST_MAIN ?? '.'] }),
     env: { ...process.env, SHECO_DATA_DIR: root },
   })
   page = await app.firstWindow()

@@ -11,11 +11,27 @@ across editing, validation, search, clipboard operations, and exports.
 attributes and limits, then uses the real ProseMirror schema. The recursive domain `DocNode`
 validator alone does not guarantee a valid editor document.
 
+`ArchitectureEmbed.tsx` is a draggable atom referencing an architecture child page by UUID,
+not storing diagram data. Its live escaped-SVG preview opens the child in a page tab. Creation
+uses `/architecture` when enabled. Keep its strict attributes, reference validation, backlinks,
+search, clipboard, Markdown expansion and print rendering consistent with page-owned diagrams.
+
 `BlockEditor.tsx` coordinates slash/wiki palettes, handle/context actions, editor updates, imports,
 math controls, and remote content synchronization. `extensions.tsx` owns custom node views such
 as callouts, links, attachments, inline databases, and code. `ImageBlock.tsx` and
 `ImageCropDialog.tsx` own image/gallery presentation and cropping. `BlockSelection.ts` owns
 selection decorations and group transactions.
+
+`templateTransactions.ts` owns template insertion as one undoable rich-document transaction.
+It preserves selected text and surrounding blocks; only an explicit slash range is replaced.
+At a code-block caret, insert after that block rather than splitting its text/comments. The shared
+template modal keeps a captured document/version/identity and rejects changed pages before dispatch.
+Validate the combined editor document, not just the template body. Literal field substitution,
+mark preservation and annotation-offset mapping are owned by `shared/documentTemplates.ts`.
+The template library adds `TemplateDateField.tsx` only to its draft editor. Inline atoms render
+compact format pickers and serialize to existing `{{date:format}}` / `{{time:format}}` text
+before entering state. Hydration preserves rich runs and code/atom boundaries; no new persisted
+block type is added to the common editor/MCP schema.
 
 Persist content through ProseMirror transactions and the provider. Put toolbar controls outside
 editable content, use appropriate `contentEditable={false}` boundaries, and keep placeholder
